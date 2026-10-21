@@ -200,12 +200,28 @@ export default function Navbar() {
               </button>
             </div>
           ) : (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <Link to="/login" className="btn btn-secondary btn-sm">
-                <LogIn size={16} />
-                Sign In
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Link 
+                to="/admin-login" 
+                className="btn btn-outline btn-sm" 
+                style={{ 
+                  borderColor: 'rgba(99, 102, 241, 0.45)', 
+                  color: '#c7d2fe', 
+                  fontSize: '0.8rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '5px'
+                }}
+                title="Dedicated login for Dr. Parkavi (Admin)"
+              >
+                <ShieldCheck size={14} color="#818cf8" />
+                <span>Admin Login</span>
               </Link>
-              <Link to="/book" className="btn btn-primary btn-sm">
+              <Link to="/login" className="btn btn-secondary btn-sm" style={{ fontSize: '0.82rem' }}>
+                <LogIn size={14} />
+                <span>Sign In</span>
+              </Link>
+              <Link to="/book" className="btn btn-primary btn-sm" style={{ fontSize: '0.82rem' }}>
                 Book Session
               </Link>
             </div>
@@ -238,9 +254,17 @@ export default function Navbar() {
           <Link to="/counsellor" onClick={() => setMobileMenuOpen(false)}>Counsellor Profile</Link>
           <Link to="/services" onClick={() => setMobileMenuOpen(false)}>Sessions & Pricing</Link>
           <Link to="/book" onClick={() => setMobileMenuOpen(false)} style={{ color: '#38bdf8' }}>Book Calendly Slot</Link>
-          {user && (
+          <Link to="/admin-login" onClick={() => setMobileMenuOpen(false)} style={{ color: '#818cf8', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <ShieldCheck size={16} />
+            Admin / Counsellor Portal
+          </Link>
+          {user ? (
             <Link to={isAdmin ? "/admin" : "/student"} onClick={() => setMobileMenuOpen(false)}>
               {isAdmin ? "Admin Dashboard" : "Student Dashboard"}
+            </Link>
+          ) : (
+            <Link to="/login" onClick={() => setMobileMenuOpen(false)}>
+              Student Sign In
             </Link>
           )}
         </div>

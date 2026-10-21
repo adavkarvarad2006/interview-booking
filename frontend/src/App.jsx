@@ -53,6 +53,7 @@ export default function App() {
               <Route path="/book" element={<BookingPage />} />
               <Route path="/booking-confirmation" element={<BookingConfirmationPage />} />
               <Route path="/login" element={<LoginPage />} />
+              <Route path="/admin-login" element={<LoginPage initialPortal="ADMIN" />} />
               <Route path="/register" element={<RegisterPage />} />
 
               {/* Student Portal (Protected) */}

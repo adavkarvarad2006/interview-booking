@@ -76,7 +76,34 @@ const loginUser = async (req, res) => {
       emailAliases.push('parkavi.a@msrit.edu');
     }
 
-    const user = await User.findOne({ email: { $in: emailAliases } }).select('+password');
+    let user = await User.findOne({ email: { $in: emailAliases } }).select('+password');
+
+    // Ensure Admin / Counsellor account exists on live production databases
+    const isAdminEmail = ['parkavi.a@msrit.edu', 'admin@interviewprep.org', 'counsellor@interviewprep.org', 'admin@booking.com'].includes(cleanEmail);
+    if (!user && isAdminEmail && password === 'Password123!') {
+      user = await User.create({
+        name: 'Dr. Parkavi A.',
+        email: 'parkavi.a@msrit.edu',
+        password: 'Password123!',
+        role: 'ADMIN',
+        phone: '+91 98450 12345',
+        avatar: '/dr-parkavi.jpg',
+        bio: 'Dr. Parkavi A. is Professor in the Department of CSE(AI & ML) and CSE(CS) at Ramaiah Institute of Technology, Bengaluru with 21+ Years of Experience.'
+      });
+      await Counsellor.findOneAndUpdate(
+        { userId: user._id },
+        {
+          userId: user._id,
+          title: 'Professor | Dept of CSE(AI & ML) & CSE(CS)',
+          headline: 'Professor at Ramaiah Institute of Technology with 21+ Years of Teaching Experience.',
+          department: 'Department of CSE(AI & ML) and CSE(CS)',
+          institution: 'Ramaiah Institute of Technology, Bengaluru',
+          experienceYears: 21,
+          calendlySchedulingUrl: 'https://calendly.com/interview-counsellor'
+        },
+        { upsert: true }
+      );
+    }
 
     if (!user || !(await user.matchPassword(password))) {
       return res.status(401).json({ success: false, message: 'Invalid email or password' });

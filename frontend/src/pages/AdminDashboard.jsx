@@ -107,6 +107,15 @@ export default function AdminDashboard() {
     return matchesStatus && matchesSearch;
   });
 
+  // Authoritative list of upcoming sessions Dr. Parkavi has to conduct
+  const upcomingSessionsToTake = appointments
+    .filter((appt) => appt.status === 'SCHEDULED' || appt.status === 'RESCHEDULED')
+    .sort((a, b) => {
+      const dateA = new Date(`${a.date} ${a.time?.split(' - ')[0] || ''}`);
+      const dateB = new Date(`${b.date} ${b.time?.split(' - ')[0] || ''}`);
+      return dateA - dateB;
+    });
+
   // Handle Blocking a Date
   const handleBlockDate = async (e) => {
     e.preventDefault();
@@ -268,12 +277,13 @@ export default function AdminDashboard() {
           }}
         >
           {[
-            { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-            { id: 'appointments', label: `Appointments (${appointments.length})`, icon: Calendar },
-            { id: 'sessions', label: `Sessions (${sessions.length})`, icon: Clock },
-            { id: 'availability', label: `Availability / Blocked Dates (${blockedDates.length})`, icon: CalendarX },
-            { id: 'students', label: `Students (${students.length})`, icon: Users },
-            { id: 'integration', label: 'Calendly & Google Calendar', icon: Settings },
+            { id: 'dashboard', label: 'Overview', icon: LayoutDashboard },
+            { id: 'schedule', label: `Sessions to Take (${upcomingSessionsToTake.length})`, icon: Clock },
+            { id: 'appointments', label: `All Booked Appointments (${appointments.length})`, icon: Calendar },
+            { id: 'students', label: `Registered Users (${students.length})`, icon: Users },
+            { id: 'sessions', label: `Session Types (${sessions.length})`, icon: Layers },
+            { id: 'availability', label: `Blocked Dates (${blockedDates.length})`, icon: CalendarX },
+            { id: 'integration', label: 'Calendly & Sync', icon: Settings },
             { id: 'profile', label: 'Counsellor Profile', icon: UserCheck }
           ].map((tab) => {
             const Icon = tab.icon;
@@ -369,6 +379,161 @@ export default function AdminDashboard() {
                   Cancelled via Calendly webhook
                 </div>
               </div>
+            </div>
+
+            {/* SESSIONS DR. PARKAVI HAS TO TAKE & AT WHAT TIME */}
+            <div 
+              className="glass-panel" 
+              style={{ 
+                padding: '30px', 
+                marginBottom: '32px', 
+                border: '1px solid rgba(99, 102, 241, 0.4)', 
+                background: 'linear-gradient(135deg, rgba(15, 23, 42, 0.98), rgba(30, 27, 75, 0.4))',
+                boxShadow: '0 12px 30px rgba(0, 0, 0, 0.35)'
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '22px', flexWrap: 'wrap', gap: '14px' }}>
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '4px' }}>
+                    <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 14px rgba(99, 102, 241, 0.4)' }}>
+                      <Clock size={20} color="#fff" />
+                    </div>
+                    <div>
+                      <h2 style={{ fontSize: '1.4rem', color: '#fff', letterSpacing: '-0.01em', margin: 0 }}>
+                        Sessions Dr. Parkavi Has to Take & At What Time
+                      </h2>
+                    </div>
+                    <span className="badge badge-primary" style={{ fontSize: '0.78rem' }}>
+                      {upcomingSessionsToTake.length} Scheduled
+                    </span>
+                  </div>
+                  <p style={{ fontSize: '0.86rem', color: 'var(--text-muted)', margin: 0, paddingLeft: '46px' }}>
+                    Live sessions scheduled for Dr. Parkavi A. with exact time slot, student details, and direct Google Meet room links.
+                  </p>
+                </div>
+
+                <button 
+                  onClick={() => setActiveTab('schedule')} 
+                  className="btn btn-outline btn-sm"
+                  style={{ fontSize: '0.82rem' }}
+                >
+                  Open Full Schedule View ({upcomingSessionsToTake.length})
+                </button>
+              </div>
+
+              {upcomingSessionsToTake.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '40px 20px', background: 'rgba(255, 255, 255, 0.02)', borderRadius: '12px', border: '1px dashed var(--border-subtle)' }}>
+                  <Calendar size={38} color="var(--text-muted)" style={{ margin: '0 auto 12px', opacity: 0.7 }} />
+                  <div style={{ color: '#fff', fontWeight: 600, fontSize: '1.05rem', marginBottom: '4px' }}>
+                    No Pending Sessions at This Moment
+                  </div>
+                  <div style={{ fontSize: '0.84rem', color: 'var(--text-muted)' }}>
+                    Your schedule is clear. Whenever students book a slot via Calendly, it will instantly show here.
+                  </div>
+                </div>
+              ) : (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: '18px' }}>
+                  {upcomingSessionsToTake.map((appt) => (
+                    <div 
+                      key={appt._id} 
+                      style={{
+                        padding: '20px',
+                        background: 'rgba(11, 17, 33, 0.9)',
+                        border: '1px solid rgba(99, 102, 241, 0.3)',
+                        borderRadius: '12px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        justifyContent: 'space-between',
+                        gap: '16px',
+                        boxShadow: '0 8px 24px rgba(0,0,0,0.25)',
+                        transition: 'transform 0.2s, border-color 0.2s'
+                      }}
+                    >
+                      <div>
+                        {/* Top Timing Badge */}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                          <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#c7d2fe', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                            📅 {appt.date}
+                          </span>
+                          <span className="badge badge-cyan" style={{ fontSize: '0.8rem', fontWeight: 700, padding: '4px 10px', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                            <Clock size={13} />
+                            {appt.time}
+                          </span>
+                        </div>
+
+                        {/* Session Topic */}
+                        <h4 style={{ fontSize: '1.1rem', color: '#fff', marginBottom: '10px', fontWeight: 700 }}>
+                          {appt.sessionTitle || '1-on-1 Interview Counselling'}
+                        </h4>
+
+                        {/* Student Details Box */}
+                        <div style={{ background: 'rgba(255, 255, 255, 0.03)', padding: '12px 14px', borderRadius: '10px', border: '1px solid var(--border-subtle)' }}>
+                          <div style={{ fontSize: '0.88rem', fontWeight: 600, color: '#fff', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <UserCheck size={16} color="#38bdf8" />
+                            <span>{appt.studentName}</span>
+                          </div>
+                          <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '3px' }}>
+                            {appt.studentEmail}
+                          </div>
+                          {appt.topic && (
+                            <div style={{ fontSize: '0.8rem', color: '#a5b4fc', marginTop: '8px', paddingTop: '6px', borderTop: '1px dashed rgba(255, 255, 255, 0.08)' }}>
+                              <strong>Focus:</strong> {appt.topic}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Action Buttons: Join Meet & Controls */}
+                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center', paddingTop: '4px' }}>
+                        <a
+                          href={appt.meetUrl || 'https://meet.google.com/new'}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="btn btn-primary btn-sm"
+                          style={{ 
+                            flex: 1, 
+                            justifyContent: 'center', 
+                            fontSize: '0.82rem', 
+                            padding: '10px',
+                            background: 'linear-gradient(135deg, #10b981, #059669)',
+                            border: 'none',
+                            fontWeight: 700
+                          }}
+                        >
+                          <Video size={15} />
+                          <span>Join Google Meet</span>
+                        </a>
+
+                        <button
+                          onClick={() => {
+                            setSelectedAppointment(appt);
+                            setRescheduleModalOpen(true);
+                          }}
+                          className="btn btn-secondary btn-sm"
+                          style={{ padding: '9px 12px', fontSize: '0.78rem' }}
+                          title="Reschedule this session"
+                        >
+                          <Clock size={14} />
+                          <span>Reschedule</span>
+                        </button>
+
+                        <button
+                          onClick={() => {
+                            setSelectedAppointment(appt);
+                            setCancelModalOpen(true);
+                          }}
+                          className="btn btn-secondary btn-sm"
+                          style={{ padding: '9px 12px', fontSize: '0.78rem', color: '#f43f5e' }}
+                          title="Cancel this session"
+                        >
+                          <CalendarX size={14} />
+                          <span>Cancel</span>
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* Quick Actions & Integration Health */}
@@ -486,6 +651,158 @@ export default function AdminDashboard() {
                 </table>
               </div>
             </div>
+          </div>
+        )}
+
+        {/* ======================================================== */}
+        {/* TAB: SESSIONS DR. PARKAVI HAS TO TAKE & AT WHAT TIME */}
+        {/* ======================================================== */}
+        {activeTab === 'schedule' && (
+          <div className="glass-panel" style={{ padding: '32px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px', marginBottom: '28px' }}>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+                  <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <Clock size={20} color="#fff" />
+                  </div>
+                  <h2 style={{ fontSize: '1.6rem', color: '#fff', margin: 0 }}>
+                    Sessions Dr. Parkavi Has to Take & At What Time
+                  </h2>
+                  <span className="badge badge-primary" style={{ fontSize: '0.8rem' }}>
+                    {upcomingSessionsToTake.length} Upcoming
+                  </span>
+                </div>
+                <div style={{ fontSize: '0.88rem', color: 'var(--text-muted)' }}>
+                  Chronological schedule of confirmed upcoming counselling sessions, exact time slots, student contacts, and video links.
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                <span className="badge badge-success" style={{ padding: '8px 14px', fontSize: '0.85rem' }}>
+                  Total Sessions Queued: {upcomingSessionsToTake.length}
+                </span>
+              </div>
+            </div>
+
+            {upcomingSessionsToTake.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '60px 20px', background: 'rgba(255, 255, 255, 0.02)', borderRadius: '12px', border: '1px dashed var(--border-subtle)' }}>
+                <Clock size={48} color="var(--text-muted)" style={{ margin: '0 auto 16px', opacity: 0.6 }} />
+                <h3 style={{ color: '#fff', fontSize: '1.2rem', marginBottom: '8px' }}>
+                  No Upcoming Sessions Scheduled
+                </h3>
+                <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', maxWidth: '500px', margin: '0 auto 20px' }}>
+                  Dr. Parkavi has no pending sessions queued right now. All standard Calendly hours are available for students to book.
+                </p>
+                <button onClick={() => setActiveTab('appointments')} className="btn btn-secondary btn-sm">
+                  View Past / Completed Appointments
+                </button>
+              </div>
+            ) : (
+              <div style={{ overflowX: 'auto' }}>
+                <table className="custom-table">
+                  <thead>
+                    <tr>
+                      <th>Date</th>
+                      <th>Time Slot</th>
+                      <th>Session Topic</th>
+                      <th>Student / User</th>
+                      <th>Duration</th>
+                      <th>Google Meet</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {upcomingSessionsToTake.map((appt) => (
+                      <tr key={appt._id}>
+                        <td>
+                          <div style={{ fontWeight: 700, color: '#fff', fontSize: '0.95rem' }}>
+                            {appt.date}
+                          </div>
+                          <div style={{ fontSize: '0.75rem', color: '#a5b4fc' }}>
+                            Authoritative
+                          </div>
+                        </td>
+                        <td>
+                          <span className="badge badge-cyan" style={{ fontSize: '0.85rem', fontWeight: 700, padding: '6px 12px', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                            <Clock size={13} />
+                            {appt.time}
+                          </span>
+                        </td>
+                        <td>
+                          <div style={{ fontWeight: 600, color: '#fff', fontSize: '0.92rem' }}>
+                            {appt.sessionTitle || '1-on-1 Interview Counselling'}
+                          </div>
+                          {appt.topic && (
+                            <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '2px' }}>
+                              Focus: {appt.topic}
+                            </div>
+                          )}
+                        </td>
+                        <td>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'rgba(56, 189, 248, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                              <UserCheck size={16} color="#38bdf8" />
+                            </div>
+                            <div>
+                              <div style={{ fontWeight: 600, color: '#fff' }}>{appt.studentName}</div>
+                              <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>{appt.studentEmail}</div>
+                            </div>
+                          </div>
+                        </td>
+                        <td>
+                          <span className="badge badge-primary">{appt.duration || 45} mins</span>
+                        </td>
+                        <td>
+                          <a
+                            href={appt.meetUrl || 'https://meet.google.com/new'}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="btn btn-primary btn-sm"
+                            style={{ 
+                              display: 'inline-flex', 
+                              alignItems: 'center', 
+                              gap: '6px', 
+                              background: 'linear-gradient(135deg, #10b981, #059669)',
+                              fontSize: '0.8rem',
+                              padding: '6px 12px'
+                            }}
+                          >
+                            <Video size={14} />
+                            <span>Join Meet</span>
+                          </a>
+                        </td>
+                        <td>
+                          <div style={{ display: 'flex', gap: '6px' }}>
+                            <button
+                              onClick={() => {
+                                setSelectedAppointment(appt);
+                                setRescheduleModalOpen(true);
+                              }}
+                              className="btn btn-secondary btn-sm"
+                              style={{ padding: '6px 10px', fontSize: '0.75rem' }}
+                              title="Reschedule session"
+                            >
+                              Reschedule
+                            </button>
+                            <button
+                              onClick={() => {
+                                setSelectedAppointment(appt);
+                                setCancelModalOpen(true);
+                              }}
+                              className="btn btn-secondary btn-sm"
+                              style={{ padding: '6px 10px', fontSize: '0.75rem', color: '#f43f5e' }}
+                              title="Cancel session"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         )}
 

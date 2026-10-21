@@ -15,12 +15,13 @@ import {
   Edit2
 } from 'lucide-react';
 
-export default function LoginPage() {
-  const [authMode, setAuthMode] = useState('otp'); // 'otp' | 'password'
+export default function LoginPage({ initialPortal = 'STUDENT' }) {
+  const [portalType, setPortalType] = useState(initialPortal); // 'STUDENT' | 'ADMIN'
+  const [authMode, setAuthMode] = useState(initialPortal === 'ADMIN' ? 'password' : 'otp'); // 'otp' | 'password'
   
   // Form states
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState(initialPortal === 'ADMIN' ? 'parkavi.a@msrit.edu' : '');
+  const [password, setPassword] = useState(initialPortal === 'ADMIN' ? 'Password123!' : '');
   const [otp, setOtp] = useState('');
   const [otpStep, setOtpStep] = useState('REQUEST'); // 'REQUEST' | 'VERIFY'
   const [devOtpHint, setDevOtpHint] = useState(null);
@@ -33,6 +34,25 @@ export default function LoginPage() {
 
   const { login, loginWithOtp, sendOtp, loginAsDemo } = useAuth();
   const navigate = useNavigate();
+
+  // Switch to Admin Portal
+  const switchToAdmin = () => {
+    setPortalType('ADMIN');
+    setAuthMode('password');
+    setEmail('parkavi.a@msrit.edu');
+    setPassword('Password123!');
+    setError(null);
+    setSuccessMsg(null);
+  };
+
+  // Switch to Student Portal
+  const switchToStudent = () => {
+    setPortalType('STUDENT');
+    setEmail('');
+    setPassword('');
+    setError(null);
+    setSuccessMsg(null);
+  };
 
   // Handle Resend Countdown
   useEffect(() => {
@@ -143,81 +163,231 @@ export default function LoginPage() {
             boxShadow: '0 20px 50px rgba(0, 0, 0, 0.5)'
           }}
         >
-          {/* Header */}
-          <div style={{ textAlign: 'center', marginBottom: '26px' }}>
-            <h1 style={{ fontSize: '1.9rem', color: '#fff', marginBottom: '8px', letterSpacing: '-0.02em' }}>
-              Sign In to InterviewPrep
-            </h1>
-            <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>
-              Access your interview counselling sessions, Google Meet rooms, and notes
-            </p>
-          </div>
-
-          {/* Mode Switcher Tabs: Email OTP vs Password */}
+          {/* Top Portal Switcher: Student vs Admin */}
           <div 
             style={{
               display: 'grid',
               gridTemplateColumns: '1fr 1fr',
-              gap: '6px',
+              gap: '8px',
               padding: '6px',
-              background: 'rgba(10, 15, 29, 0.7)',
-              borderRadius: '10px',
+              background: 'rgba(10, 15, 29, 0.85)',
+              borderRadius: '12px',
               border: '1px solid var(--border-subtle)',
-              marginBottom: '24px'
+              marginBottom: '26px'
             }}
           >
             <button
               type="button"
-              onClick={() => {
-                setAuthMode('otp');
-                setError(null);
-              }}
+              onClick={switchToStudent}
               style={{
-                padding: '9px 12px',
+                padding: '10px 14px',
                 borderRadius: '8px',
                 border: 'none',
-                background: authMode === 'otp' ? 'linear-gradient(135deg, #6366f1, #4f46e5)' : 'transparent',
-                color: authMode === 'otp' ? '#fff' : 'var(--text-muted)',
-                fontWeight: 600,
-                fontSize: '0.85rem',
+                background: portalType === 'STUDENT' ? 'linear-gradient(135deg, #0284c7, #0369a1)' : 'transparent',
+                color: portalType === 'STUDENT' ? '#fff' : 'var(--text-muted)',
+                fontWeight: 700,
+                fontSize: '0.88rem',
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                gap: '6px',
-                transition: 'all 0.2s'
+                gap: '8px',
+                transition: 'all 0.2s',
+                boxShadow: portalType === 'STUDENT' ? '0 4px 12px rgba(2, 132, 199, 0.35)' : 'none'
               }}
             >
-              <Mail size={15} />
-              <span>Email OTP (Fast)</span>
+              <User size={16} />
+              <span>Student Portal</span>
             </button>
 
             <button
               type="button"
-              onClick={() => {
-                setAuthMode('password');
-                setError(null);
-              }}
+              onClick={switchToAdmin}
               style={{
-                padding: '9px 12px',
+                padding: '10px 14px',
                 borderRadius: '8px',
                 border: 'none',
-                background: authMode === 'password' ? 'linear-gradient(135deg, #6366f1, #4f46e5)' : 'transparent',
-                color: authMode === 'password' ? '#fff' : 'var(--text-muted)',
-                fontWeight: 600,
-                fontSize: '0.85rem',
+                background: portalType === 'ADMIN' ? 'linear-gradient(135deg, #6366f1, #4f46e5)' : 'transparent',
+                color: portalType === 'ADMIN' ? '#fff' : 'var(--text-muted)',
+                fontWeight: 700,
+                fontSize: '0.88rem',
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                gap: '6px',
-                transition: 'all 0.2s'
+                gap: '8px',
+                transition: 'all 0.2s',
+                boxShadow: portalType === 'ADMIN' ? '0 4px 12px rgba(99, 102, 241, 0.35)' : 'none'
               }}
             >
-              <KeyRound size={15} />
-              <span>Password Login</span>
+              <ShieldCheck size={16} />
+              <span>Admin / Counsellor</span>
             </button>
           </div>
+
+          {/* Header */}
+          <div style={{ textAlign: 'center', marginBottom: '24px' }}>
+            {portalType === 'ADMIN' ? (
+              <div>
+                <div style={{
+                  width: '52px',
+                  height: '52px',
+                  borderRadius: '16px',
+                  background: 'linear-gradient(135deg, #6366f1, #a855f7)',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  marginBottom: '12px',
+                  boxShadow: '0 8px 24px rgba(99, 102, 241, 0.45)'
+                }}>
+                  <ShieldCheck size={28} color="#fff" />
+                </div>
+                <h1 style={{ fontSize: '1.85rem', color: '#fff', marginBottom: '6px', letterSpacing: '-0.02em' }}>
+                  Admin & Counsellor Login
+                </h1>
+                <p style={{ color: 'var(--text-muted)', fontSize: '0.88rem', lineHeight: '1.5' }}>
+                  Dr. Parkavi A. Portal — Manage booked appointments, student directory, and sessions schedule
+                </p>
+              </div>
+            ) : (
+              <div>
+                <h1 style={{ fontSize: '1.85rem', color: '#fff', marginBottom: '8px', letterSpacing: '-0.02em' }}>
+                  Sign In to InterviewPrep
+                </h1>
+                <p style={{ color: 'var(--text-muted)', fontSize: '0.88rem' }}>
+                  Access your interview counselling sessions, Google Meet rooms, and notes
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* ADMIN PORTAL SPECIAL CREDENTIALS BOX */}
+          {portalType === 'ADMIN' && (
+            <div 
+              style={{
+                background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.14), rgba(168, 85, 247, 0.08))',
+                border: '1px solid rgba(99, 102, 241, 0.4)',
+                borderRadius: '12px',
+                padding: '18px',
+                marginBottom: '24px'
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <Sparkles size={16} color="#a5b4fc" />
+                  <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#e0e7ff', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                    Official Admin Credentials
+                  </span>
+                </div>
+                <span className="badge badge-primary" style={{ fontSize: '0.7rem' }}>
+                  Verified Access
+                </span>
+              </div>
+
+              <div style={{ background: 'rgba(10, 15, 30, 0.6)', padding: '12px 14px', borderRadius: '8px', marginBottom: '14px', border: '1px solid rgba(255, 255, 255, 0.05)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                  <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>Admin Email:</span>
+                  <code style={{ fontSize: '0.88rem', color: '#38bdf8', fontWeight: 600 }}>parkavi.a@msrit.edu</code>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>Admin Password:</span>
+                  <code style={{ fontSize: '0.88rem', color: '#34d399', fontWeight: 600 }}>Password123!</code>
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEmail('parkavi.a@msrit.edu');
+                    setPassword('Password123!');
+                  }}
+                  className="btn btn-secondary btn-sm"
+                  style={{ fontSize: '0.8rem', justifyContent: 'center' }}
+                >
+                  Auto-Fill Credentials
+                </button>
+                <button
+                  type="button"
+                  disabled={loading}
+                  onClick={() => handleDemo('ADMIN')}
+                  className="btn btn-primary btn-sm"
+                  style={{ fontSize: '0.8rem', justifyContent: 'center' }}
+                >
+                  <LogIn size={14} />
+                  Instant 1-Click Login
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Student Mode Switcher Tabs: Email OTP vs Password */}
+          {portalType === 'STUDENT' && (
+            <div 
+              style={{
+                display: 'grid',
+                gridTemplateColumns: '1fr 1fr',
+                gap: '6px',
+                padding: '6px',
+                background: 'rgba(10, 15, 29, 0.7)',
+                borderRadius: '10px',
+                border: '1px solid var(--border-subtle)',
+                marginBottom: '24px'
+              }}
+            >
+              <button
+                type="button"
+                onClick={() => {
+                  setAuthMode('otp');
+                  setError(null);
+                }}
+                style={{
+                  padding: '9px 12px',
+                  borderRadius: '8px',
+                  border: 'none',
+                  background: authMode === 'otp' ? 'linear-gradient(135deg, #6366f1, #4f46e5)' : 'transparent',
+                  color: authMode === 'otp' ? '#fff' : 'var(--text-muted)',
+                  fontWeight: 600,
+                  fontSize: '0.85rem',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px',
+                  transition: 'all 0.2s'
+                }}
+              >
+                <Mail size={15} />
+                <span>Email OTP (Fast)</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setAuthMode('password');
+                  setError(null);
+                }}
+                style={{
+                  padding: '9px 12px',
+                  borderRadius: '8px',
+                  border: 'none',
+                  background: authMode === 'password' ? 'linear-gradient(135deg, #6366f1, #4f46e5)' : 'transparent',
+                  color: authMode === 'password' ? '#fff' : 'var(--text-muted)',
+                  fontWeight: 600,
+                  fontSize: '0.85rem',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px',
+                  transition: 'all 0.2s'
+                }}
+              >
+                <KeyRound size={15} />
+                <span>Password Login</span>
+              </button>
+            </div>
+          )}
 
           {/* Notifications */}
           {error && (
@@ -404,51 +574,47 @@ export default function LoginPage() {
           {/* MODE 2: PASSWORD LOGIN */}
           {authMode === 'password' && (
             <div>
-              {/* Quick Demo Credentials Box */}
-              <div style={{ padding: '14px', background: 'rgba(99, 102, 241, 0.08)', borderRadius: '10px', border: '1px dashed rgba(99, 102, 241, 0.4)', marginBottom: '20px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem', fontWeight: 600, color: '#a5b4fc', marginBottom: '10px' }}>
-                  <Sparkles size={14} />
-                  <span>One-Click Demo Access:</span>
-                </div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px' }}>
-                  <button
-                    type="button"
-                    disabled={loading}
-                    onClick={() => handleDemo('ADMIN')}
-                    className="btn btn-secondary btn-sm"
-                    style={{ fontSize: '0.78rem', justifyContent: 'center' }}
-                  >
-                    <ShieldCheck size={14} color="#818cf8" />
-                    Counsellor (Dr. Parkavi)
-                  </button>
+              {portalType === 'STUDENT' && (
+                /* Quick Student Demo Box */
+                <div style={{ padding: '12px 14px', background: 'rgba(56, 189, 248, 0.08)', borderRadius: '10px', border: '1px dashed rgba(56, 189, 248, 0.35)', marginBottom: '18px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem', fontWeight: 600, color: '#7dd3fc' }}>
+                      <Sparkles size={14} />
+                      <span>One-Click Student Demo:</span>
+                    </div>
+                  </div>
                   <button
                     type="button"
                     disabled={loading}
                     onClick={() => handleDemo('STUDENT')}
                     className="btn btn-secondary btn-sm"
-                    style={{ fontSize: '0.78rem', justifyContent: 'center' }}
+                    style={{ width: '100%', fontSize: '0.8rem', justifyContent: 'center' }}
                   >
                     <User size={14} color="#38bdf8" />
-                    Student (Emily)
+                    Sign In as Student (Emily Watson)
                   </button>
                 </div>
-              </div>
+              )}
 
               <form onSubmit={handlePasswordSubmit}>
-                <div className="form-group">
-                  <label className="form-label">Email Address</label>
+                <div className="form-group" style={{ marginBottom: '16px' }}>
+                  <label className="form-label" style={{ fontSize: '0.85rem' }}>
+                    {portalType === 'ADMIN' ? 'Admin / Counsellor Email' : 'Email Address'}
+                  </label>
                   <input
                     type="email"
                     className="form-input"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    placeholder="you@domain.com"
+                    placeholder={portalType === 'ADMIN' ? 'parkavi.a@msrit.edu' : 'you@domain.com'}
                     required
                   />
                 </div>
 
-                <div className="form-group">
-                  <label className="form-label">Password</label>
+                <div className="form-group" style={{ marginBottom: '20px' }}>
+                  <label className="form-label" style={{ fontSize: '0.85rem' }}>
+                    {portalType === 'ADMIN' ? 'Admin Password' : 'Password'}
+                  </label>
                   <input
                     type="password"
                     className="form-input"
@@ -459,9 +625,25 @@ export default function LoginPage() {
                   />
                 </div>
 
-                <button type="submit" disabled={loading} className="btn btn-primary" style={{ width: '100%', marginTop: '6px', padding: '12px' }}>
+                <button 
+                  type="submit" 
+                  disabled={loading} 
+                  className="btn btn-primary" 
+                  style={{ 
+                    width: '100%', 
+                    padding: '12px',
+                    justifyContent: 'center',
+                    background: portalType === 'ADMIN' ? 'linear-gradient(135deg, #6366f1, #4f46e5)' : undefined 
+                  }}
+                >
                   <LogIn size={16} />
-                  <span>{loading ? 'Authenticating...' : 'Sign In with Password'}</span>
+                  <span>
+                    {loading 
+                      ? 'Authenticating...' 
+                      : portalType === 'ADMIN' 
+                        ? 'Sign In as Admin (Dr. Parkavi)' 
+                        : 'Sign In with Password'}
+                  </span>
                 </button>
               </form>
             </div>
