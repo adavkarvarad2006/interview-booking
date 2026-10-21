@@ -53,6 +53,8 @@ export const api = {
   getAllAppointments: (params = '') => request(`/appointments${params ? `?${params}` : ''}`),
   getAppointment: (id) => request(`/appointments/${id}`),
   updateAppointmentStatus: (id, data) => request(`/appointments/${id}/status`, { method: 'PATCH', body: JSON.stringify(data) }),
+  cancelAppointment: (id, data = {}) => request(`/appointments/${id}/cancel`, { method: 'POST', body: JSON.stringify(data) }),
+  rescheduleAppointment: (id, data) => request(`/appointments/${id}/reschedule`, { method: 'POST', body: JSON.stringify(data) }),
 
   // Availability & Blocked Dates
   getBlockedDates: () => request('/availability/blocked'),

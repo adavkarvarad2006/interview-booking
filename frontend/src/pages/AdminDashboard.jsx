@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '../services/api';
 import WebhookSimulatorModal from '../components/WebhookSimulatorModal';
+import RescheduleModal from '../components/RescheduleModal';
+import CancelModal from '../components/CancelModal';
 import { 
   LayoutDashboard, 
   Calendar, 
@@ -53,6 +55,11 @@ export default function AdminDashboard() {
   // Session Edit / Create Modal state
   const [sessionModalOpen, setSessionModalOpen] = useState(false);
   const [editingSession, setEditingSession] = useState(null);
+
+  // Reschedule & Cancel modals
+  const [rescheduleModalOpen, setRescheduleModalOpen] = useState(false);
+  const [cancelModalOpen, setCancelModalOpen] = useState(false);
+  const [selectedAppointment, setSelectedAppointment] = useState(null);
 
   // Profile Edit state
   const [profileSaving, setProfileSaving] = useState(false);
@@ -616,17 +623,36 @@ export default function AdminDashboard() {
                               </button>
                             )}
 
-                            {appt.rescheduleUrl && (
-                              <a
-                                href={appt.rescheduleUrl}
-                                target="_blank"
-                                rel="noreferrer"
+                            {appt.status === 'SCHEDULED' && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setSelectedAppointment(appt);
+                                  setRescheduleModalOpen(true);
+                                }}
                                 className="btn btn-secondary btn-sm"
-                                style={{ padding: '4px 8px', fontSize: '0.75rem' }}
-                                title="Open Calendly Reschedule link"
+                                style={{ padding: '4px 8px', fontSize: '0.75rem', gap: '4px' }}
+                                title="Reschedule session"
                               >
+                                <RefreshCw size={11} />
                                 Reschedule
-                              </a>
+                              </button>
+                            )}
+
+                            {appt.status === 'SCHEDULED' && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setSelectedAppointment(appt);
+                                  setCancelModalOpen(true);
+                                }}
+                                className="btn btn-danger btn-sm"
+                                style={{ padding: '4px 8px', fontSize: '0.75rem', gap: '4px' }}
+                                title="Cancel appointment slot"
+                              >
+                                <XCircle size={11} />
+                                Cancel
+                              </button>
                             )}
                           </div>
                         </td>
@@ -1080,6 +1106,32 @@ export default function AdminDashboard() {
         isOpen={simulatorOpen}
         onClose={() => setSimulatorOpen(false)}
         onWebhookSuccess={() => {
+          loadDashboardData();
+        }}
+      />
+
+      {/* Reschedule Modal */}
+      <RescheduleModal
+        isOpen={rescheduleModalOpen}
+        onClose={() => {
+          setRescheduleModalOpen(false);
+          setSelectedAppointment(null);
+        }}
+        appointment={selectedAppointment}
+        onSuccess={() => {
+          loadDashboardData();
+        }}
+      />
+
+      {/* Cancel Modal */}
+      <CancelModal
+        isOpen={cancelModalOpen}
+        onClose={() => {
+          setCancelModalOpen(false);
+          setSelectedAppointment(null);
+        }}
+        appointment={selectedAppointment}
+        onSuccess={() => {
           loadDashboardData();
         }}
       />

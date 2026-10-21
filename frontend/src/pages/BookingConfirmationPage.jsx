@@ -28,8 +28,8 @@ export default function BookingConfirmationPage() {
     time = '10:00 AM',
     counsellorName = 'Dr. Parkavi A.',
     googleMeetLink: initialMeetLink,
-    rescheduleUrl = 'https://calendly.com/reschedulings/sample',
-    cancelUrl = 'https://calendly.com/cancellations/sample'
+    rescheduleUrl = '',
+    cancelUrl = ''
   } = state;
 
   const [copied, setCopied] = useState(false);

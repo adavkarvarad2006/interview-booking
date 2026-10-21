@@ -4,7 +4,9 @@ const {
   getMyAppointments,
   getAllAppointments,
   getAppointmentById,
-  updateAppointmentStatus
+  updateAppointmentStatus,
+  cancelAppointment,
+  rescheduleAppointment
 } = require('../controllers/appointmentController');
 const { protect, authorize } = require('../middleware/auth');
 
@@ -12,5 +14,7 @@ router.get('/my', protect, getMyAppointments);
 router.get('/', protect, authorize('ADMIN', 'COUNSELLOR'), getAllAppointments);
 router.get('/:id', protect, getAppointmentById);
 router.patch('/:id/status', protect, authorize('ADMIN', 'COUNSELLOR'), updateAppointmentStatus);
+router.post('/:id/cancel', protect, cancelAppointment);
+router.post('/:id/reschedule', protect, rescheduleAppointment);
 
 module.exports = router;

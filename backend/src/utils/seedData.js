@@ -200,8 +200,8 @@ const seedDatabase = async () => {
       sessionTitle: session15.title,
       sessionType: 'COUNSELLING',
       notes: 'Focus on Google L4 SWE intern interview preparation and technical resume polish.',
-      rescheduleUrl: 'https://calendly.com/reschedulings/EVT_SEED_001',
-      cancelUrl: 'https://calendly.com/cancellations/EVT_SEED_001',
+      rescheduleUrl: '',
+      cancelUrl: '',
       googleCalendarEventUrl: 'https://calendar.google.com/calendar'
     });
 
@@ -220,8 +220,8 @@ const seedDatabase = async () => {
       sessionTitle: session30.title,
       sessionType: 'MOCK_INTERVIEW',
       notes: 'Distributed cache & message queue architecture mock session with live feedback.',
-      rescheduleUrl: 'https://calendly.com/reschedulings/EVT_SEED_002',
-      cancelUrl: 'https://calendly.com/cancellations/EVT_SEED_002',
+      rescheduleUrl: '',
+      cancelUrl: '',
       googleCalendarEventUrl: 'https://calendar.google.com/calendar'
     });
 
@@ -240,8 +240,8 @@ const seedDatabase = async () => {
       sessionTitle: session15.title,
       sessionType: 'COUNSELLING',
       notes: 'Initial alignment on target tier-1 tech firms and career roadmap.',
-      rescheduleUrl: 'https://calendly.com/reschedulings/EVT_SEED_003',
-      cancelUrl: 'https://calendly.com/cancellations/EVT_SEED_003'
+      rescheduleUrl: '',
+      cancelUrl: ''
     });
 
     // 8. Create Sample Notifications

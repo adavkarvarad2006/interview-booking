@@ -130,9 +130,8 @@ export default function BookingPage() {
         studentName: sName,
         studentEmail: sEmail,
         counsellorName: counsellor ? counsellor.name : 'Dr. Parkavi A.',
-        googleMeetLink,
-        rescheduleUrl: eventData.rawPayload?.invitee?.reschedule_url || 'https://calendly.com/reschedulings/sample',
-        cancelUrl: eventData.rawPayload?.invitee?.cancel_url || 'https://calendly.com/cancellations/sample'
+        rescheduleUrl: (eventData.rawPayload?.invitee?.reschedule_url && !eventData.rawPayload.invitee.reschedule_url.includes('sample') && !eventData.rawPayload.invitee.reschedule_url.includes('sim_')) ? eventData.rawPayload.invitee.reschedule_url : '',
+        cancelUrl: (eventData.rawPayload?.invitee?.cancel_url && !eventData.rawPayload.invitee.cancel_url.includes('sample') && !eventData.rawPayload.invitee.cancel_url.includes('sim_')) ? eventData.rawPayload.invitee.cancel_url : ''
       }
     });
   };

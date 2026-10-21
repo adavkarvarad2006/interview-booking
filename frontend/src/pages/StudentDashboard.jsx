@@ -15,8 +15,11 @@ import {
   Briefcase, 
   FileText,
   Plus,
-  Video
+  Video,
+  RefreshCw
 } from 'lucide-react';
+import RescheduleModal from '../components/RescheduleModal';
+import CancelModal from '../components/CancelModal';
 
 export default function StudentDashboard() {
   const { user, isStudent } = useAuth();
@@ -24,6 +27,29 @@ export default function StudentDashboard() {
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('appointments'); // appointments, goals, notifications
+  const [rescheduleModalOpen, setRescheduleModalOpen] = useState(false);
+  const [cancelModalOpen, setCancelModalOpen] = useState(false);
+  const [selectedAppointment, setSelectedAppointment] = useState(null);
+  const [toast, setToast] = useState(null);
+
+  const showToast = (msg, type = 'success') => {
+    setToast({ msg, type });
+    setTimeout(() => setToast(null), 4000);
+  };
+
+  const handleAppointmentRescheduled = (updatedAppt) => {
+    setAppointments((prev) =>
+      prev.map((a) => (a._id === updatedAppt._id ? updatedAppt : a))
+    );
+    showToast(`Session successfully rescheduled to ${updatedAppt.date} at ${updatedAppt.startTime}!`);
+  };
+
+  const handleAppointmentCancelled = (updatedAppt) => {
+    setAppointments((prev) =>
+      prev.map((a) => (a._id === updatedAppt._id ? updatedAppt : a))
+    );
+    showToast('Your session slot has been cancelled.', 'info');
+  };
 
   useEffect(() => {
     const fetchDashboard = async () => {
@@ -230,28 +256,34 @@ export default function StudentDashboard() {
                         </a>
                       )}
 
-                      {appt.rescheduleUrl && appt.status === 'SCHEDULED' && (
-                        <a
-                          href={appt.rescheduleUrl}
-                          target="_blank"
-                          rel="noreferrer"
+                      {appt.status === 'SCHEDULED' && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedAppointment(appt);
+                            setRescheduleModalOpen(true);
+                          }}
                           className="btn btn-secondary btn-sm"
+                          style={{ gap: '6px' }}
                         >
+                          <RefreshCw size={13} />
                           <span>Reschedule</span>
-                          <ExternalLink size={12} />
-                        </a>
+                        </button>
                       )}
 
-                      {appt.cancelUrl && appt.status === 'SCHEDULED' && (
-                        <a
-                          href={appt.cancelUrl}
-                          target="_blank"
-                          rel="noreferrer"
+                      {appt.status === 'SCHEDULED' && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedAppointment(appt);
+                            setCancelModalOpen(true);
+                          }}
                           className="btn btn-danger btn-sm"
+                          style={{ gap: '6px' }}
                         >
+                          <XCircle size={13} />
                           <span>Cancel Slot</span>
-                          <ExternalLink size={12} />
-                        </a>
+                        </button>
                       )}
 
                       {appt.googleCalendarEventUrl && (
@@ -345,6 +377,55 @@ export default function StudentDashboard() {
             )}
           </div>
         )}
+
+        {/* Floating Toast Notification */}
+        {toast && (
+          <div
+            style={{
+              position: 'fixed',
+              bottom: '30px',
+              right: '30px',
+              padding: '12px 20px',
+              borderRadius: '8px',
+              background: toast.type === 'info' ? 'rgba(30, 41, 59, 0.95)' : 'rgba(16, 185, 129, 0.95)',
+              color: '#fff',
+              border: toast.type === 'info' ? '1px solid rgba(255, 255, 255, 0.15)' : '1px solid rgba(16, 185, 129, 0.4)',
+              boxShadow: '0 10px 30px rgba(0, 0, 0, 0.5)',
+              zIndex: 9999,
+              fontSize: '0.9rem',
+              fontWeight: 600,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '10px',
+              animation: 'fadeIn 0.2s ease-in'
+            }}
+          >
+            {toast.type === 'info' ? <AlertCircle size={18} /> : <CheckCircle size={18} />}
+            <span>{toast.msg}</span>
+          </div>
+        )}
+
+        {/* Reschedule Modal */}
+        <RescheduleModal
+          isOpen={rescheduleModalOpen}
+          onClose={() => {
+            setRescheduleModalOpen(false);
+            setSelectedAppointment(null);
+          }}
+          appointment={selectedAppointment}
+          onSuccess={handleAppointmentRescheduled}
+        />
+
+        {/* Cancel Modal */}
+        <CancelModal
+          isOpen={cancelModalOpen}
+          onClose={() => {
+            setCancelModalOpen(false);
+            setSelectedAppointment(null);
+          }}
+          appointment={selectedAppointment}
+          onSuccess={handleAppointmentCancelled}
+        />
       </div>
     </div>
   );

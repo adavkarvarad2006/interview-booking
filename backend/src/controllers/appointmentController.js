@@ -141,9 +141,165 @@ const updateAppointmentStatus = async (req, res) => {
   }
 };
 
+function computeEndTime(dateStr, startTimeStr, durationMinutes = 15) {
+  try {
+    let hours = 0;
+    let minutes = 0;
+    const isAmPm = /am|pm/i.test(startTimeStr);
+    if (isAmPm) {
+      const match = startTimeStr.match(/(\d+):(\d+)\s*(am|pm)/i);
+      if (match) {
+        hours = parseInt(match[1], 10);
+        minutes = parseInt(match[2], 10);
+        const meridiem = match[3].toLowerCase();
+        if (meridiem === 'pm' && hours < 12) hours += 12;
+        if (meridiem === 'am' && hours === 12) hours = 0;
+      }
+    } else {
+      const parts = startTimeStr.split(':');
+      hours = parseInt(parts[0], 10);
+      minutes = parseInt(parts[1], 10);
+    }
+    const d = new Date(2000, 0, 1, hours, minutes + durationMinutes);
+    if (isAmPm) {
+      let endH = d.getHours();
+      const endM = String(d.getMinutes()).padStart(2, '0');
+      const endMeridiem = endH >= 12 ? 'PM' : 'AM';
+      if (endH > 12) endH -= 12;
+      if (endH === 0) endH = 12;
+      return `${String(endH).padStart(2, '0')}:${endM} ${endMeridiem}`;
+    } else {
+      return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+    }
+  } catch (e) {
+    return startTimeStr;
+  }
+}
+
+// @desc    Cancel an appointment (by Student or Admin)
+// @route   POST /api/appointments/:id/cancel
+// @access  Private
+const cancelAppointment = async (req, res) => {
+  try {
+    const { reason = 'Cancelled by student' } = req.body;
+    const appointment = await Appointment.findById(req.params.id);
+
+    if (!appointment) {
+      return res.status(404).json({ success: false, message: 'Appointment not found' });
+    }
+
+    const isOwner =
+      (appointment.studentId && String(appointment.studentId) === String(req.user._id)) ||
+      (appointment.studentEmail && appointment.studentEmail.toLowerCase() === req.user.email.toLowerCase());
+    const isStaff = ['ADMIN', 'COUNSELLOR'].includes(req.user.role);
+
+    if (!isOwner && !isStaff) {
+      return res.status(403).json({ success: false, message: 'Not authorized to cancel this appointment' });
+    }
+
+    appointment.status = 'CANCELLED';
+    appointment.cancellationReason = reason;
+    appointment.canceledAt = new Date();
+    await appointment.save();
+
+    // Create Notification
+    const notifUserId = appointment.studentId || req.user._id;
+    await Notification.create({
+      userId: notifUserId,
+      title: 'Appointment Cancelled',
+      message: `Your appointment for "${appointment.sessionTitle}" on ${appointment.date} has been cancelled. Reason: ${reason}`,
+      type: 'SYSTEM',
+      appointmentId: appointment._id
+    });
+
+    res.json({
+      success: true,
+      message: 'Appointment successfully cancelled',
+      data: appointment
+    });
+  } catch (error) {
+    console.error('[Cancel Appointment Error]:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Reschedule an appointment (by Student or Admin)
+// @route   POST /api/appointments/:id/reschedule
+// @access  Private
+const rescheduleAppointment = async (req, res) => {
+  try {
+    const { newDate, newTime, reason } = req.body;
+
+    if (!newDate || !newTime) {
+      return res.status(400).json({ success: false, message: 'Please provide both newDate and newTime' });
+    }
+
+    const appointment = await Appointment.findById(req.params.id);
+
+    if (!appointment) {
+      return res.status(404).json({ success: false, message: 'Appointment not found' });
+    }
+
+    const isOwner =
+      (appointment.studentId && String(appointment.studentId) === String(req.user._id)) ||
+      (appointment.studentEmail && appointment.studentEmail.toLowerCase() === req.user.email.toLowerCase());
+    const isStaff = ['ADMIN', 'COUNSELLOR'].includes(req.user.role);
+
+    if (!isOwner && !isStaff) {
+      return res.status(403).json({ success: false, message: 'Not authorized to reschedule this appointment' });
+    }
+
+    const previousDate = appointment.date;
+    const previousTime = appointment.startTime;
+    const duration = appointment.duration || 15;
+
+    appointment.date = newDate;
+    appointment.startTime = newTime;
+    appointment.endTime = computeEndTime(newDate, newTime, duration);
+    appointment.status = 'SCHEDULED';
+    appointment.cancellationReason = '';
+    appointment.canceledAt = null;
+
+    if (reason) {
+      appointment.notes = appointment.notes ? `${appointment.notes} | Rescheduled: ${reason}` : `Rescheduled: ${reason}`;
+    }
+
+    // Refresh Google Calendar link with new date/time
+    const meetLink = appointment.googleMeetLink || 'https://meet.google.com/interview-session';
+    appointment.googleCalendarEventUrl = `https://calendar.google.com/calendar/r/eventedit?text=${encodeURIComponent(
+      appointment.sessionTitle
+    )}&details=${encodeURIComponent(
+      `Interview Counselling Session with ${appointment.studentName}.\n🎥 Video Meeting Link: ${meetLink}\nDuration: ${duration} Minutes`
+    )}&location=${encodeURIComponent(meetLink)}`;
+
+    await appointment.save();
+
+    // Create Notification
+    const notifUserId = appointment.studentId || req.user._id;
+    await Notification.create({
+      userId: notifUserId,
+      title: 'Appointment Rescheduled',
+      message: `Your appointment for "${appointment.sessionTitle}" has been rescheduled from ${previousDate} (${previousTime}) to ${newDate} at ${newTime}.`,
+      type: 'SYSTEM',
+      appointmentId: appointment._id
+    });
+
+    res.json({
+      success: true,
+      message: 'Appointment successfully rescheduled',
+      data: appointment
+    });
+  } catch (error) {
+    console.error('[Reschedule Appointment Error]:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 module.exports = {
   getMyAppointments,
   getAllAppointments,
   getAppointmentById,
-  updateAppointmentStatus
+  updateAppointmentStatus,
+  cancelAppointment,
+  rescheduleAppointment
 };

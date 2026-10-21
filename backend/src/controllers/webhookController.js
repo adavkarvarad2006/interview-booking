@@ -300,8 +300,8 @@ const simulateWebhook = async (req, res) => {
         name: studentName,
         email: studentEmail,
         status: 'active',
-        reschedule_url: `https://calendly.com/reschedulings/${mockEventId}`,
-        cancel_url: `https://calendly.com/cancellations/${mockEventId}`,
+        reschedule_url: '',
+        cancel_url: '',
         scheduled_event: {
           uri: `https://api.calendly.com/scheduled_events/${mockEventId}`,
           name: sessionTitle,
