@@ -1,5 +1,6 @@
 const Appointment = require('../models/Appointment');
 const Notification = require('../models/Notification');
+const { findAppointmentConflict, computeEndTime } = require('../utils/timeConflict');
 
 // @desc    Get appointments for the logged-in student
 // @route   GET /api/appointments/my
@@ -141,41 +142,6 @@ const updateAppointmentStatus = async (req, res) => {
   }
 };
 
-function computeEndTime(dateStr, startTimeStr, durationMinutes = 15) {
-  try {
-    let hours = 0;
-    let minutes = 0;
-    const isAmPm = /am|pm/i.test(startTimeStr);
-    if (isAmPm) {
-      const match = startTimeStr.match(/(\d+):(\d+)\s*(am|pm)/i);
-      if (match) {
-        hours = parseInt(match[1], 10);
-        minutes = parseInt(match[2], 10);
-        const meridiem = match[3].toLowerCase();
-        if (meridiem === 'pm' && hours < 12) hours += 12;
-        if (meridiem === 'am' && hours === 12) hours = 0;
-      }
-    } else {
-      const parts = startTimeStr.split(':');
-      hours = parseInt(parts[0], 10);
-      minutes = parseInt(parts[1], 10);
-    }
-    const d = new Date(2000, 0, 1, hours, minutes + durationMinutes);
-    if (isAmPm) {
-      let endH = d.getHours();
-      const endM = String(d.getMinutes()).padStart(2, '0');
-      const endMeridiem = endH >= 12 ? 'PM' : 'AM';
-      if (endH > 12) endH -= 12;
-      if (endH === 0) endH = 12;
-      return `${String(endH).padStart(2, '0')}:${endM} ${endMeridiem}`;
-    } else {
-      return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-    }
-  } catch (e) {
-    return startTimeStr;
-  }
-}
-
 // @desc    Cancel an appointment (by Student or Admin)
 // @route   POST /api/appointments/:id/cancel
 // @access  Private
@@ -252,6 +218,21 @@ const rescheduleAppointment = async (req, res) => {
     const previousDate = appointment.date;
     const previousTime = appointment.startTime;
     const duration = appointment.duration || 15;
+
+    // Check for conflict with other SCHEDULED appointments on the new date & time
+    const conflict = await findAppointmentConflict(Appointment, {
+      date: newDate,
+      startTime: newTime,
+      duration,
+      excludeId: appointment._id
+    });
+
+    if (conflict) {
+      return res.status(409).json({
+        success: false,
+        message: `The slot on ${newDate} at ${newTime} is already booked. The counsellor can only take one session at a time. Please select an available slot.`
+      });
+    }
 
     appointment.date = newDate;
     appointment.startTime = newTime;

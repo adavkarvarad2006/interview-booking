@@ -4,6 +4,7 @@ const Student = require('../models/Student');
 const InterviewSession = require('../models/InterviewSession');
 const Notification = require('../models/Notification');
 const CalendlyIntegration = require('../models/CalendlyIntegration');
+const { findAppointmentConflict } = require('../utils/timeConflict');
 
 /**
  * Helper to parse ISO date/time into readable string formats
@@ -140,6 +141,23 @@ const handleCalendlyWebhook = async (req, res) => {
       }
 
       const googleCalUrl = `https://calendar.google.com/calendar/r/eventedit?text=${encodeURIComponent(eventName)}&details=${encodeURIComponent(`Interview Counselling Session with Dr. Parkavi A.\nJoin Google Meet: ${googleMeetLink}\n\nNotes: ${notes || 'None'}`)}&location=${encodeURIComponent(googleMeetLink)}`;
+
+      // Check for overlapping SCHEDULED appointment
+      const existingSameInvitee = await Appointment.findOne({ calendlyInviteeId: inviteeUri });
+      const conflict = await findAppointmentConflict(Appointment, {
+        date,
+        startTime: startTimeFormatted,
+        duration,
+        excludeId: existingSameInvitee?._id
+      });
+
+      if (conflict) {
+        console.warn(`[Webhook Conflict Blocked] Slot on ${date} at ${startTimeFormatted} already booked.`);
+        return res.status(409).json({
+          success: false,
+          message: `Slot conflict: Counsellor is already booked on ${date} at ${conflict.startTime}`
+        });
+      }
 
       // Upsert appointment record (idempotency by calendlyInviteeId)
       const appointment = await Appointment.findOneAndUpdate(
@@ -290,6 +308,20 @@ const simulateWebhook = async (req, res) => {
     let payload = {};
 
     if (eventType === 'invitee.created') {
+      // Check for slot conflict with any existing SCHEDULED appointment
+      const conflict = await findAppointmentConflict(Appointment, {
+        date,
+        startTime: time,
+        duration: Number(duration)
+      });
+
+      if (conflict) {
+        return res.status(409).json({
+          success: false,
+          message: `The counsellor already has a scheduled session on ${date} at ${conflict.startTime} (${conflict.sessionTitle}). The counsellor can only take one session at a time. Please select an available slot.`
+        });
+      }
+
       const startTime = new Date(`${date}T${time}:00Z`).toISOString();
       const endTime = new Date(new Date(startTime).getTime() + duration * 60000).toISOString();
       const sessionTitle = duration === 30 ? 'Mock Interview & Training' : 'Quick Interview Counselling';

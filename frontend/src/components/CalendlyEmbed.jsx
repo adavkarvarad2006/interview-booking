@@ -15,6 +15,8 @@ import {
   Mail,
   FileText
 } from 'lucide-react';
+import { api } from '../services/api';
+import { isSlotBooked } from '../utils/timeConflict';
 
 export default function CalendlyEmbed({
   url: initialUrl,
@@ -58,6 +60,34 @@ export default function CalendlyEmbed({
   const [notes, setNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [urlInputVisible, setUrlInputVisible] = useState(false);
+  const [bookedSlots, setBookedSlots] = useState([]);
+  const [loadingSlots, setLoadingSlots] = useState(false);
+  const [slotError, setSlotError] = useState(null);
+
+  // Fetch booked slots whenever selectedDate changes
+  useEffect(() => {
+    let isMounted = true;
+    const fetchSlots = async () => {
+      setLoadingSlots(true);
+      setSlotError(null);
+      try {
+        const res = await api.getBookedSlots(selectedDate);
+        if (isMounted && res.success) {
+          setBookedSlots(res.bookedSlots || []);
+        }
+      } catch (err) {
+        console.warn('Could not fetch booked slots:', err);
+      } finally {
+        if (isMounted) setLoadingSlots(false);
+      }
+    };
+    if (selectedDate) {
+      fetchSlots();
+    }
+    return () => {
+      isMounted = false;
+    };
+  }, [selectedDate]);
 
   // Keep student details synced if prefill loads late
   useEffect(() => {
@@ -150,11 +180,29 @@ export default function CalendlyEmbed({
     '05:00 PM'
   ];
 
+  // Auto-switch selectedTime if currently selected slot is booked
+  useEffect(() => {
+    if (timeSlots.length > 0) {
+      const currentBooked = isSlotBooked(selectedTime, bookedSlots, duration);
+      if (currentBooked) {
+        const firstAvailable = timeSlots.find((s) => !isSlotBooked(s, bookedSlots, duration));
+        setSelectedTime(firstAvailable || '');
+      }
+    }
+  }, [bookedSlots, duration, selectedDate]);
+
   const handleDirectBooking = async (e) => {
     e.preventDefault();
     if (!selectedDate || !selectedTime) return;
 
+    // Client-side conflict guard
+    if (isSlotBooked(selectedTime, bookedSlots, duration)) {
+      setSlotError(`The ${selectedTime} slot on ${selectedDate} is already booked. Please choose another available time.`);
+      return;
+    }
+
     setSubmitting(true);
+    setSlotError(null);
     try {
       if (onEventScheduled) {
         await onEventScheduled({
@@ -170,6 +218,7 @@ export default function CalendlyEmbed({
       }
     } catch (err) {
       console.error('Direct booking error:', err);
+      setSlotError(err.message || 'Error booking appointment. Please try again.');
     } finally {
       setSubmitting(false);
     }
@@ -376,38 +425,123 @@ export default function CalendlyEmbed({
 
             {/* Step 2: Select Time Slot */}
             <div style={{ marginBottom: '24px' }}>
-              <label style={{ fontSize: '0.82rem', fontWeight: 600, color: '#e2e8f0', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '10px' }}>
-                <Clock size={15} color="#818cf8" />
-                2. Select Available Time Slot (IST):
-              </label>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                <label style={{ fontSize: '0.82rem', fontWeight: 600, color: '#e2e8f0', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <Clock size={15} color="#818cf8" />
+                  2. Select Available Time Slot (IST):
+                </label>
+                <span style={{ fontSize: '0.78rem', color: '#94a3b8' }}>
+                  {loadingSlots ? (
+                    'Checking availability...'
+                  ) : (
+                    `${timeSlots.filter((s) => !isSlotBooked(s, bookedSlots, duration)).length} of ${timeSlots.length} available`
+                  )}
+                </span>
+              </div>
+
+              {slotError && (
+                <div
+                  style={{
+                    padding: '10px 14px',
+                    borderRadius: '8px',
+                    background: 'rgba(239, 68, 68, 0.15)',
+                    border: '1px solid rgba(239, 68, 68, 0.4)',
+                    color: '#fca5a5',
+                    fontSize: '0.85rem',
+                    marginBottom: '14px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px'
+                  }}
+                >
+                  <AlertCircle size={16} />
+                  <span>{slotError}</span>
+                </div>
+              )}
 
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))', gap: '8px' }}>
-                {timeSlots.map((slot) => (
-                  <button
-                    key={slot}
-                    type="button"
-                    onClick={() => setSelectedTime(slot)}
-                    style={{
-                      padding: '10px 12px',
-                      borderRadius: '8px',
-                      border: selectedTime === slot 
-                        ? '2px solid #38bdf8' 
-                        : '1px solid var(--border-subtle)',
-                      background: selectedTime === slot 
-                        ? 'rgba(56, 189, 248, 0.2)' 
-                        : 'rgba(255, 255, 255, 0.03)',
-                      color: selectedTime === slot ? '#38bdf8' : '#e2e8f0',
-                      cursor: 'pointer',
-                      fontSize: '0.85rem',
-                      fontWeight: selectedTime === slot ? 600 : 400,
-                      textAlign: 'center',
-                      transition: 'all 0.2s'
-                    }}
-                  >
-                    {slot}
-                  </button>
-                ))}
+                {timeSlots.map((slot) => {
+                  const booked = isSlotBooked(slot, bookedSlots, duration);
+                  const isSelected = selectedTime === slot;
+
+                  if (booked) {
+                    return (
+                      <div
+                        key={slot}
+                        style={{
+                          padding: '10px 12px',
+                          borderRadius: '8px',
+                          border: '1px dashed rgba(239, 68, 68, 0.3)',
+                          background: 'rgba(239, 68, 68, 0.05)',
+                          color: '#64748b',
+                          opacity: 0.6,
+                          cursor: 'not-allowed',
+                          fontSize: '0.85rem',
+                          textAlign: 'center',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '2px'
+                        }}
+                        title="This time slot is already booked. The counsellor can only take one session at a time."
+                      >
+                        <span style={{ textDecoration: 'line-through' }}>{slot}</span>
+                        <span style={{ fontSize: '0.68rem', color: '#f87171', fontWeight: 600 }}>Booked</span>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <button
+                      key={slot}
+                      type="button"
+                      onClick={() => {
+                        setSelectedTime(slot);
+                        setSlotError(null);
+                      }}
+                      style={{
+                        padding: '10px 12px',
+                        borderRadius: '8px',
+                        border: isSelected 
+                          ? '2px solid #38bdf8' 
+                          : '1px solid var(--border-subtle)',
+                        background: isSelected 
+                          ? 'rgba(56, 189, 248, 0.2)' 
+                          : 'rgba(255, 255, 255, 0.03)',
+                        color: isSelected ? '#38bdf8' : '#e2e8f0',
+                        cursor: 'pointer',
+                        fontSize: '0.85rem',
+                        fontWeight: isSelected ? 600 : 400,
+                        textAlign: 'center',
+                        transition: 'all 0.2s'
+                      }}
+                    >
+                      {slot}
+                    </button>
+                  );
+                })}
               </div>
+
+              {timeSlots.every((s) => isSlotBooked(s, bookedSlots, duration)) && !loadingSlots && (
+                <div
+                  style={{
+                    marginTop: '12px',
+                    padding: '12px',
+                    borderRadius: '8px',
+                    background: 'rgba(239, 68, 68, 0.1)',
+                    border: '1px solid rgba(239, 68, 68, 0.3)',
+                    color: '#fca5a5',
+                    fontSize: '0.85rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px'
+                  }}
+                >
+                  <AlertCircle size={16} />
+                  <span>All interview counselling slots on this date are fully booked. Please select another date above.</span>
+                </div>
+              )}
             </div>
 
             {/* Step 3: Student Details */}

@@ -100,7 +100,7 @@ export default function BookingPage() {
           studentEmail: sEmail,
           duration: selectedDuration,
           date: bookingDate,
-          time: bookingTime.split(' ')[0] || '10:00',
+          time: bookingTime,
           reason: eventData.notes || '1-on-1 Interview Mentorship Session'
         });
         if (webhookRes?.googleMeetLink) {
@@ -109,7 +109,8 @@ export default function BookingPage() {
           googleMeetLink = webhookRes.data.googleMeetLink;
         }
       } catch (err) {
-        console.warn('Booking appointment creation error:', err);
+        console.error('Booking appointment creation error:', err);
+        throw err;
       }
     }
 

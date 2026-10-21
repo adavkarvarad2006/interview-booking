@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { api } from '../services/api';
 import { X, Calendar, Clock, RefreshCw, AlertCircle, CheckCircle2, ExternalLink } from 'lucide-react';
 import confetti from 'canvas-confetti';
+import { isSlotBooked } from '../utils/timeConflict';
 
 const POPULAR_SLOTS = [
   '09:30 AM',
@@ -39,6 +40,8 @@ export default function RescheduleModal({ isOpen, onClose, appointment, onSucces
   const [reason, setReason] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [bookedSlots, setBookedSlots] = useState([]);
+  const [loadingSlots, setLoadingSlots] = useState(false);
 
   // Initialize with tomorrow's date or next working day
   useEffect(() => {
@@ -49,11 +52,53 @@ export default function RescheduleModal({ isOpen, onClose, appointment, onSucces
       const mm = String(tomorrow.getMonth() + 1).padStart(2, '0');
       const dd = String(tomorrow.getDate()).padStart(2, '0');
       setNewDate(`${yyyy}-${mm}-${dd}`);
-      setSelectedSlot(appointment.startTime || '10:00 AM');
+      setSelectedSlot('');
       setReason('');
       setError(null);
     }
   }, [isOpen, appointment]);
+
+  // Fetch booked slots whenever newDate changes
+  useEffect(() => {
+    let isMounted = true;
+    const fetchSlots = async () => {
+      if (!newDate) return;
+      setLoadingSlots(true);
+      try {
+        const res = await api.getBookedSlots(newDate);
+        if (isMounted && res.success) {
+          // Exclude current appointment being rescheduled
+          const relevant = (res.bookedSlots || []).filter(
+            (b) => String(b._id) !== String(appointment?._id)
+          );
+          setBookedSlots(relevant);
+        }
+      } catch (err) {
+        console.warn('Could not fetch booked slots for reschedule:', err);
+      } finally {
+        if (isMounted) setLoadingSlots(false);
+      }
+    };
+    if (isOpen && newDate) {
+      fetchSlots();
+    }
+    return () => {
+      isMounted = false;
+    };
+  }, [newDate, isOpen, appointment]);
+
+  // Auto-select first available slot if current is booked or none selected
+  useEffect(() => {
+    if (POPULAR_SLOTS.length > 0 && newDate) {
+      const isCurrentBooked = selectedSlot && isSlotBooked(selectedSlot, bookedSlots, appointment?.duration || 15);
+      if (!selectedSlot || isCurrentBooked) {
+        const firstAvail = POPULAR_SLOTS.find(
+          (s) => !isSlotBooked(s, bookedSlots, appointment?.duration || 15)
+        );
+        setSelectedSlot(firstAvail || '');
+      }
+    }
+  }, [bookedSlots, newDate, appointment]);
 
   if (!isOpen || !appointment) return null;
 
@@ -221,7 +266,9 @@ export default function RescheduleModal({ isOpen, onClose, appointment, onSucces
           <div className="form-group" style={{ marginBottom: '18px' }}>
             <label className="form-label" style={{ fontSize: '0.85rem', display: 'flex', justifyContent: 'space-between' }}>
               <span>Select New Time Slot</span>
-              <span style={{ color: '#818cf8', fontWeight: 600 }}>{selectedSlot || 'None selected'}</span>
+              <span style={{ color: '#818cf8', fontWeight: 600 }}>
+                {loadingSlots ? 'Checking slots...' : selectedSlot || 'None selected'}
+              </span>
             </label>
             <div
               style={{
@@ -232,12 +279,45 @@ export default function RescheduleModal({ isOpen, onClose, appointment, onSucces
               }}
             >
               {POPULAR_SLOTS.map((slot) => {
+                const booked = isSlotBooked(slot, bookedSlots, appointment?.duration || 15);
                 const isSelected = selectedSlot === slot;
+
+                if (booked) {
+                  return (
+                    <div
+                      key={slot}
+                      style={{
+                        padding: '8px 10px',
+                        borderRadius: '8px',
+                        fontSize: '0.82rem',
+                        border: '1px dashed rgba(239, 68, 68, 0.3)',
+                        background: 'rgba(239, 68, 68, 0.05)',
+                        color: '#64748b',
+                        opacity: 0.6,
+                        cursor: 'not-allowed',
+                        textAlign: 'center',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '2px'
+                      }}
+                      title="This slot is already booked for this counsellor."
+                    >
+                      <span style={{ textDecoration: 'line-through' }}>{slot}</span>
+                      <span style={{ fontSize: '0.65rem', color: '#f87171', fontWeight: 600 }}>Booked</span>
+                    </div>
+                  );
+                }
+
                 return (
                   <button
                     key={slot}
                     type="button"
-                    onClick={() => setSelectedSlot(slot)}
+                    onClick={() => {
+                      setSelectedSlot(slot);
+                      setError(null);
+                    }}
                     style={{
                       padding: '8px 10px',
                       borderRadius: '8px',
@@ -257,6 +337,26 @@ export default function RescheduleModal({ isOpen, onClose, appointment, onSucces
                 );
               })}
             </div>
+
+            {POPULAR_SLOTS.every((s) => isSlotBooked(s, bookedSlots, appointment?.duration || 15)) && !loadingSlots && (
+              <div
+                style={{
+                  marginTop: '10px',
+                  padding: '10px',
+                  borderRadius: '6px',
+                  background: 'rgba(239, 68, 68, 0.1)',
+                  border: '1px solid rgba(239, 68, 68, 0.3)',
+                  color: '#fca5a5',
+                  fontSize: '0.82rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}
+              >
+                <AlertCircle size={14} />
+                <span>All time slots on this date are already booked. Please choose another date above.</span>
+              </div>
+            )}
           </div>
 
           {/* Reason */}

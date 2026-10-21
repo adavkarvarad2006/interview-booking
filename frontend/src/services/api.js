@@ -58,6 +58,7 @@ export const api = {
 
   // Availability & Blocked Dates
   getBlockedDates: () => request('/availability/blocked'),
+  getBookedSlots: (date = '') => request(`/availability/slots${date ? `?date=${date}` : ''}`),
   blockDate: (data) => request('/availability/block', { method: 'POST', body: JSON.stringify(data) }),
   unblockDate: (id) => request(`/availability/block/${id}`, { method: 'DELETE' }),
   getAvailabilityExplanation: () => request('/availability/explanation'),

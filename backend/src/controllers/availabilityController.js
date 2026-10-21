@@ -1,5 +1,7 @@
 const BlockedDate = require('../models/BlockedDate');
+const Appointment = require('../models/Appointment');
 const Notification = require('../models/Notification');
+const { normalizeTime } = require('../utils/timeConflict');
 
 // @desc    Get all blocked dates
 // @route   GET /api/availability/blocked
@@ -129,9 +131,49 @@ const getAvailabilityExplanation = (req, res) => {
   });
 };
 
+// @desc    Get all booked/unavailable time slots for a specific date or all dates
+// @route   GET /api/availability/slots
+// @access  Public
+const getBookedSlots = async (req, res) => {
+  try {
+    const { date } = req.query;
+    const filter = { status: 'SCHEDULED' }; // Only active scheduled sessions block availability!
+
+    if (date) {
+      filter.date = date.trim();
+    }
+
+    const scheduledAppointments = await Appointment.find(filter)
+      .select('date startTime endTime duration sessionTitle')
+      .sort({ date: 1, startTime: 1 });
+
+    const blockedDates = await BlockedDate.find().select('date reason');
+
+    const formattedSlots = scheduledAppointments.map((appt) => ({
+      _id: appt._id,
+      date: appt.date,
+      startTime: normalizeTime(appt.startTime),
+      endTime: appt.endTime,
+      duration: appt.duration || 15,
+      sessionTitle: appt.sessionTitle
+    }));
+
+    res.json({
+      success: true,
+      date: date || 'ALL',
+      count: formattedSlots.length,
+      bookedSlots: formattedSlots,
+      blockedDates: blockedDates.map((b) => b.date)
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 module.exports = {
   getBlockedDates,
   blockDate,
   unblockDate,
-  getAvailabilityExplanation
+  getAvailabilityExplanation,
+  getBookedSlots
 };
