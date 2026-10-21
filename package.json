@@ -1,0 +1,24 @@
+{
+  "name": "interview-counselling-booking-system",
+  "version": "1.0.0",
+  "description": "MERN Interview Counselling Booking Platform with Calendly and Google Calendar Integration",
+  "scripts": {
+    "install:all": "npm --prefix backend install && npm --prefix frontend install",
+    "build": "npm --prefix frontend run build",
+    "start": "node backend/src/server.js",
+    "start:backend": "npm --prefix backend start",
+    "dev:backend": "npm --prefix backend run dev",
+    "dev:frontend": "npm --prefix frontend run dev",
+    "seed": "node backend/src/utils/seedData.js",
+    "build:frontend": "npm --prefix frontend run build"
+  },
+  "keywords": [
+    "mern",
+    "calendly",
+    "google-calendar",
+    "appointment-booking",
+    "interview-counselling"
+  ],
+  "author": "Antigravity",
+  "license": "ISC"
+}
