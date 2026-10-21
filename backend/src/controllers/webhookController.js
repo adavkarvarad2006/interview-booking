@@ -4,24 +4,38 @@ const Student = require('../models/Student');
 const InterviewSession = require('../models/InterviewSession');
 const Notification = require('../models/Notification');
 const CalendlyIntegration = require('../models/CalendlyIntegration');
-const { findAppointmentConflict } = require('../utils/timeConflict');
+const { 
+  findAppointmentConflict, 
+  normalizeTime, 
+  timeToMinutes, 
+  computeEndTime 
+} = require('../utils/timeConflict');
 
 /**
- * Helper to parse ISO date/time into readable string formats
+ * Helper to parse ISO date/time into readable string formats in India Standard Time
  */
-const formatDateTime = (isoString) => {
+const formatDateTime = (isoString, timeZone = 'Asia/Kolkata') => {
   if (!isoString) return { date: '', time: '' };
   try {
     const d = new Date(isoString);
-    const date = d.toISOString().split('T')[0];
+    if (isNaN(d.getTime())) {
+      return { date: String(isoString).split('T')[0], time: '' };
+    }
+    const date = new Intl.DateTimeFormat('en-CA', {
+      timeZone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    }).format(d);
     const time = d.toLocaleTimeString('en-US', {
+      timeZone,
       hour: '2-digit',
       minute: '2-digit',
       hour12: true
     });
     return { date, time };
   } catch (err) {
-    return { date: isoString, time: '' };
+    return { date: String(isoString).split('T')[0], time: '' };
   }
 };
 
@@ -81,8 +95,12 @@ const handleCalendlyWebhook = async (req, res) => {
         duration = Math.round((endMs - startMs) / 60000);
       }
 
-      const { date, time: startTimeFormatted } = formatDateTime(startTimeIso);
+      const { date: parsedDate, time: startTimeFormatted } = formatDateTime(startTimeIso);
       const { time: endTimeFormatted } = formatDateTime(endTimeIso);
+
+      const date = payload.date || parsedDate;
+      const startTime = payload.startTime || startTimeFormatted || startTimeIso;
+      const endTime = payload.endTime || endTimeFormatted || endTimeIso;
 
       // Extract notes / Q&A
       let notes = '';
@@ -146,13 +164,13 @@ const handleCalendlyWebhook = async (req, res) => {
       const existingSameInvitee = await Appointment.findOne({ calendlyInviteeId: inviteeUri });
       const conflict = await findAppointmentConflict(Appointment, {
         date,
-        startTime: startTimeFormatted,
+        startTime,
         duration,
         excludeId: existingSameInvitee?._id
       });
 
       if (conflict) {
-        console.warn(`[Webhook Conflict Blocked] Slot on ${date} at ${startTimeFormatted} already booked.`);
+        console.warn(`[Webhook Conflict Blocked] Slot on ${date} at ${startTime} already booked.`);
         return res.status(409).json({
           success: false,
           message: `Slot conflict: Counsellor is already booked on ${date} at ${conflict.startTime}`
@@ -168,8 +186,8 @@ const handleCalendlyWebhook = async (req, res) => {
           calendlyEventId: eventUri,
           calendlyInviteeId: inviteeUri,
           date,
-          startTime: startTimeFormatted || startTimeIso,
-          endTime: endTimeFormatted || endTimeIso,
+          startTime,
+          endTime,
           duration,
           status: 'SCHEDULED',
           studentName,
@@ -308,23 +326,40 @@ const simulateWebhook = async (req, res) => {
     let payload = {};
 
     if (eventType === 'invitee.created') {
+      const durationNum = Number(duration) || 15;
+      const cleanDate = (date ? String(date).split('T')[0] : new Date().toISOString().split('T')[0]).trim();
+      const normalizedTime = normalizeTime(time) || time;
+
       // Check for slot conflict with any existing SCHEDULED appointment
       const conflict = await findAppointmentConflict(Appointment, {
-        date,
-        startTime: time,
-        duration: Number(duration)
+        date: cleanDate,
+        startTime: normalizedTime,
+        duration: durationNum
       });
 
       if (conflict) {
         return res.status(409).json({
           success: false,
-          message: `The counsellor already has a scheduled session on ${date} at ${conflict.startTime} (${conflict.sessionTitle}). The counsellor can only take one session at a time. Please select an available slot.`
+          message: `The counsellor already has a scheduled session on ${cleanDate} at ${conflict.startTime} (${conflict.sessionTitle}). The counsellor can only take one session at a time. Please select an available slot.`
         });
       }
 
-      const startTime = new Date(`${date}T${time}:00Z`).toISOString();
-      const endTime = new Date(new Date(startTime).getTime() + duration * 60000).toISOString();
-      const sessionTitle = duration === 30 ? 'Mock Interview & Training' : 'Quick Interview Counselling';
+      // Convert time to hours and minutes from midnight
+      const startMins = timeToMinutes(normalizedTime);
+      const startH = String(Math.floor(startMins / 60)).padStart(2, '0');
+      const startM = String(startMins % 60).padStart(2, '0');
+
+      // Create valid ISO timestamp in IST (+05:30)
+      const startDate = new Date(`${cleanDate}T${startH}:${startM}:00+05:30`);
+      const startTime = !isNaN(startDate.getTime())
+        ? startDate.toISOString()
+        : new Date().toISOString();
+      const endTime = !isNaN(startDate.getTime())
+        ? new Date(startDate.getTime() + durationNum * 60000).toISOString()
+        : new Date(Date.now() + durationNum * 60000).toISOString();
+
+      const computedEnd = computeEndTime(cleanDate, normalizedTime, durationNum);
+      const sessionTitle = durationNum === 30 ? 'Mock Interview & Training' : 'Quick Interview Counselling';
 
       payload = {
         event: `https://api.calendly.com/scheduled_events/${mockEventId}`,
@@ -332,6 +367,9 @@ const simulateWebhook = async (req, res) => {
         name: studentName,
         email: studentEmail,
         status: 'active',
+        date: cleanDate,
+        startTime: normalizedTime,
+        endTime: computedEnd,
         reschedule_url: '',
         cancel_url: '',
         scheduled_event: {
@@ -339,7 +377,7 @@ const simulateWebhook = async (req, res) => {
           name: sessionTitle,
           start_time: startTime,
           end_time: endTime,
-          event_type: `https://api.calendly.com/event_types/type_${duration}m`
+          event_type: `https://api.calendly.com/event_types/type_${durationNum}m`
         },
         questions_and_answers: [
           {

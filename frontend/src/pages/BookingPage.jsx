@@ -130,6 +130,7 @@ export default function BookingPage() {
         time: bookingTime,
         studentName: sName,
         studentEmail: sEmail,
+        googleMeetLink,
         counsellorName: counsellor ? counsellor.name : 'Dr. Parkavi A.',
         rescheduleUrl: (eventData.rawPayload?.invitee?.reschedule_url && !eventData.rawPayload.invitee.reschedule_url.includes('sample') && !eventData.rawPayload.invitee.reschedule_url.includes('sim_')) ? eventData.rawPayload.invitee.reschedule_url : '',
         cancelUrl: (eventData.rawPayload?.invitee?.cancel_url && !eventData.rawPayload.invitee.cancel_url.includes('sample') && !eventData.rawPayload.invitee.cancel_url.includes('sim_')) ? eventData.rawPayload.invitee.cancel_url : ''
