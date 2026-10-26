@@ -118,11 +118,30 @@ app.use((err, req, res, next) => {
 
 const PORT = process.env.PORT || 5000;
 
+const { verifyEmailTransporter } = require('./services/emailService');
+
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`=======================================================`);
   console.log(`🚀 Interview Counselling Server running on port ${PORT}`);
   console.log(`📅 Primary Scheduling Platform: Calendly`);
   console.log(`📆 Calendar Integration: Google Calendar`);
   console.log(`🔗 Webhook Endpoint: http://localhost:${PORT}/api/calendly/webhook`);
+  
+  // Verify Nodemailer Email Transporter
+  verifyEmailTransporter().then(status => {
+    if (status.verified) {
+      console.log(`📧 [Email Service] ✅ Nodemailer SMTP verified and ready to send real emails!`);
+    } else if (!status.configured) {
+      console.log(`📧 [Email Service] ℹ️ SMTP not configured in backend/.env. OTP runs in simulated mode.`);
+    } else {
+      console.warn(`📧 [Email Service] ⚠️ SMTP connection warning: ${status.error}`);
+      if (status.hint) {
+        console.warn(`📧 [Email Service] 💡 Hint: ${status.hint}`);
+      }
+    }
+  }).catch(err => {
+    console.warn(`📧 [Email Service] Transporter check error:`, err.message);
+  });
+
   console.log(`=======================================================`);
 });

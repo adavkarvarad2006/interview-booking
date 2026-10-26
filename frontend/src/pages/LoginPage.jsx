@@ -91,9 +91,7 @@ export default function LoginPage({ initialPortal = 'STUDENT' }) {
       setOtpStep('VERIFY');
       setResendTimer(60); // 60s cooldown
       setSuccessMsg(res.message || `Verification code dispatched to ${email}`);
-      if (res.devOtp) {
-        setDevOtpHint(res.devOtp);
-      }
+      setDevOtpHint(res.devOtp || null);
     } catch (err) {
       setError(err.message || 'Failed to dispatch verification code');
     } finally {

@@ -10,7 +10,8 @@
     "dev:backend": "npm --prefix backend run dev",
     "dev:frontend": "npm --prefix frontend run dev",
     "seed": "node backend/src/utils/seedData.js",
-    "build:frontend": "npm --prefix frontend run build"
+    "build:frontend": "npm --prefix frontend run build",
+    "test:email": "npm --prefix backend run test:email"
   },
   "keywords": [
     "mern",

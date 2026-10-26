@@ -230,17 +230,29 @@ const sendOtp = async (req, res) => {
       purpose: 'LOGIN'
     });
 
-    // Send the email (or log to console in dev)
-    await sendOtpEmail(cleanEmail, otp);
+    // Send the email via Nodemailer
+    const emailResult = await sendOtpEmail(cleanEmail, otp);
 
+    // If SMTP is configured but failed (e.g. wrong password), inform the client
+    if (!emailResult.success) {
+      return res.status(500).json({
+        success: false,
+        message: emailResult.error || 'Failed to dispatch verification email. Please verify SMTP settings in backend/.env'
+      });
+    }
+
+    const isSimulated = emailResult.simulated === true;
     const isDev = process.env.NODE_ENV !== 'production';
 
     res.json({
       success: true,
-      message: `A 6-digit verification code has been dispatched to ${cleanEmail}`,
+      message: isSimulated
+        ? `[Dev Simulation] Verification code generated for ${cleanEmail}`
+        : `A 6-digit verification code has been dispatched to ${cleanEmail}. Please check your inbox or spam folder.`,
       email: cleanEmail,
       expiresInMinutes: 10,
-      devOtp: isDev ? otp : undefined
+      simulated: isSimulated,
+      devOtp: (isSimulated && isDev) ? otp : undefined
     });
   } catch (error) {
     console.error('[Send OTP Error]', error);
