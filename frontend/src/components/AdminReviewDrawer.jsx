@@ -48,7 +48,7 @@ export default function AdminReviewDrawer({
       setIsEditingLinks(false);
 
       // If appointment lacks resumeUrl, query backend to fetch freshly synced student resume
-      if (isOpen && appointment._id && !appointment.resumeUrl) {
+      if (isOpen && appointment._id && appointment.sessionTitle !== 'Registered Candidate Dossier' && !appointment.resumeUrl) {
         api.getAppointment(appointment._id).then(res => {
           if (res?.success && res?.data) {
             setCurrentAppt(res.data);
@@ -62,6 +62,7 @@ export default function AdminReviewDrawer({
       }
     }
   }, [appointment, isOpen]);
+
 
 
   // Handle ESC key to close drawer
@@ -125,8 +126,10 @@ export default function AdminReviewDrawer({
         const res = await api.uploadResume({
           fileName: file.name,
           fileData: base64,
-          appointmentId: appointment._id
+          appointmentId: appointment.sessionTitle !== 'Registered Candidate Dossier' ? appointment._id : undefined,
+          studentEmail: appointment.studentEmail || undefined
         });
+
 
         if (res.success && res.data) {
           const updated = {
@@ -150,6 +153,7 @@ export default function AdminReviewDrawer({
 
   const activeAppt = currentAppt || appointment;
   const rawResumeUrl = activeAppt?.resumeUrl || activeAppt?.sessionId?.resumeUrl || '';
+  const resumeUrl = rawResumeUrl;
   const effectiveResumeUrl = rawResumeUrl ? getFileUrl(rawResumeUrl) : (activeAppt?._id ? getAppointmentResumeUrl(activeAppt._id) : '');
   const resumeFileName = activeAppt?.resumeFileName || (rawResumeUrl ? rawResumeUrl.split('/').pop() : 'Candidate_Resume.pdf');
   const meetLink = activeAppt?.googleMeetLink || activeAppt?.meetUrl || 'https://meet.google.com/new';
@@ -158,6 +162,7 @@ export default function AdminReviewDrawer({
   if (embedUrl.includes('drive.google.com') && embedUrl.includes('/view')) {
     embedUrl = embedUrl.replace(/\/view(\?.*)?$/, '/preview');
   }
+
 
 
   return (

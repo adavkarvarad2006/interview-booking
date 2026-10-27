@@ -187,13 +187,19 @@ const getAllStudents = async (req, res) => {
 
     const studentData = await Promise.all(
       students.map(async (st) => {
+        const cleanEmail = st.email.toLowerCase().trim();
+        const emailRegex = new RegExp(`^${cleanEmail.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i');
         const profile = await Student.findOne({ userId: st._id });
-        const appointmentCount = await Appointment.countDocuments({
-          $or: [{ studentId: st._id }, { studentEmail: st.email.toLowerCase() }]
-        });
         const lastAppointment = await Appointment.findOne({
-          $or: [{ studentId: st._id }, { studentEmail: st.email.toLowerCase() }]
+          $or: [{ studentId: st._id }, { studentEmail: emailRegex }]
         }).sort({ createdAt: -1 });
+
+        const appointmentCount = await Appointment.countDocuments({
+          $or: [{ studentId: st._id }, { studentEmail: emailRegex }]
+        });
+
+        const resumeUrl = profile?.resumeUrl || lastAppointment?.resumeUrl || '';
+        const resumeFileName = profile?.resumeFileName || lastAppointment?.resumeFileName || (resumeUrl ? resumeUrl.split('/').pop() : '');
 
         return {
           _id: st._id,
@@ -203,12 +209,18 @@ const getAllStudents = async (req, res) => {
           createdAt: st.createdAt,
           targetRoles: profile ? profile.targetRoles : [],
           targetCompanies: profile ? profile.targetCompanies : [],
+          resumeUrl,
+          resumeFileName,
+          githubUrl: profile?.githubUrl || lastAppointment?.githubUrl || '',
+          linkedinUrl: profile?.linkedinUrl || lastAppointment?.linkedinUrl || '',
+          portfolioUrl: profile?.portfolioUrl || lastAppointment?.portfolioUrl || '',
           appointmentCount,
           lastAppointmentDate: lastAppointment ? lastAppointment.date : null,
           lastAppointmentStatus: lastAppointment ? lastAppointment.status : null
         };
       })
     );
+
 
     res.json({
       success: true,

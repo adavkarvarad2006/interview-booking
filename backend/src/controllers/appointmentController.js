@@ -20,18 +20,34 @@ const enrichAppointmentWithStudentContext = async (appointment) => {
   const apptObj = appointment.toObject ? appointment.toObject() : { ...appointment };
 
   let studentDoc = null;
-  if (apptObj.studentId) {
-    studentDoc = await Student.findOne({ userId: apptObj.studentId });
+  const studentUserId = apptObj.studentId?._id || apptObj.studentId;
+  if (studentUserId) {
+    studentDoc = await Student.findOne({ userId: studentUserId });
   }
   if (!studentDoc && apptObj.studentEmail) {
-    const user = await User.findOne({ email: apptObj.studentEmail.toLowerCase() });
+    const cleanEmail = apptObj.studentEmail.toLowerCase().trim();
+    const user = await User.findOne({
+      email: { $regex: new RegExp(`^${cleanEmail.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') }
+    });
     if (user) {
       studentDoc = await Student.findOne({ userId: user._id });
     }
   }
 
   if (studentDoc) {
-    apptObj.resumeUrl = apptObj.resumeUrl || studentDoc.resumeUrl || '';
+    if (studentDoc.resumeUrl && !apptObj.resumeUrl) {
+      apptObj.resumeUrl = studentDoc.resumeUrl;
+      apptObj.resumeFileName = studentDoc.resumeFileName || studentDoc.resumeUrl.split('/').pop();
+      // Asynchronously backfill appointment in DB
+      if (apptObj._id) {
+        Appointment.findByIdAndUpdate(apptObj._id, {
+          $set: {
+            resumeUrl: apptObj.resumeUrl,
+            resumeFileName: apptObj.resumeFileName
+          }
+        }).catch(err => console.warn('[Enrich Sync Warning]:', err.message));
+      }
+    }
     apptObj.resumeFileName = apptObj.resumeFileName || studentDoc.resumeFileName || (apptObj.resumeUrl ? apptObj.resumeUrl.split('/').pop() : '');
     apptObj.githubUrl = apptObj.githubUrl || studentDoc.githubUrl || '';
     apptObj.linkedinUrl = apptObj.linkedinUrl || studentDoc.linkedinUrl || '';
@@ -44,6 +60,7 @@ const enrichAppointmentWithStudentContext = async (appointment) => {
 
   return apptObj;
 };
+
 
 const enrichAppointments = async (appointments) => {
   return Promise.all(appointments.map(enrichAppointmentWithStudentContext));

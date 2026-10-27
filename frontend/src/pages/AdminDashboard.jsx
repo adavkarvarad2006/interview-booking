@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { api } from '../services/api';
+import { api, getFileUrl } from '../services/api';
 import WebhookSimulatorModal from '../components/WebhookSimulatorModal';
 import RescheduleModal from '../components/RescheduleModal';
 import CancelModal from '../components/CancelModal';
@@ -19,16 +19,19 @@ import {
   ExternalLink, 
   ShieldCheck, 
   Sparkles, 
-  RefreshCw,
-  Search,
-  Filter,
-  Lock,
-  Layers,
-  CalendarX,
-  UserCheck,
-  Video,
-  FileText
+  RefreshCw, 
+  Search, 
+  Filter, 
+  Lock, 
+  Layers, 
+  CalendarX, 
+  UserCheck, 
+  Video, 
+  FileText,
+  Download,
+  Upload
 } from 'lucide-react';
+
 import { 
   getEffectiveAppointmentStatus, 
   hasAppointmentPassed, 
@@ -670,6 +673,7 @@ export default function AdminDashboard() {
                       <th>Time</th>
                       <th>Duration</th>
                       <th>Status</th>
+                      <th>Resume & Dossier</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -697,9 +701,31 @@ export default function AdminDashboard() {
                             );
                           })()}
                         </td>
+                        <td>
+                          <button
+                            onClick={() => setReviewDrawerAppt(appt)}
+                            className="btn btn-secondary btn-sm"
+                            style={{
+                              padding: '5px 10px',
+                              fontSize: '0.78rem',
+                              background: appt.resumeUrl ? 'rgba(99, 102, 241, 0.2)' : 'rgba(255, 255, 255, 0.04)',
+                              borderColor: appt.resumeUrl ? '#818cf8' : 'rgba(255, 255, 255, 0.1)',
+                              color: appt.resumeUrl ? '#a5b4fc' : '#94a3b8',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '5px',
+                              fontWeight: 600
+                            }}
+                            title="Open candidate resume & dossier drawer"
+                          >
+                            <FileText size={13} color={appt.resumeUrl ? '#818cf8' : 'currentColor'} />
+                            <span>{appt.resumeUrl ? 'View Resume' : 'Resume Dossier'}</span>
+                          </button>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
+
                 </table>
               </div>
             </div>
@@ -930,10 +956,11 @@ export default function AdminDashboard() {
                     <th>Time</th>
                     <th>Duration</th>
                     <th>Status</th>
-                    <th>Calendly Event</th>
+                    <th>Resume (PDF)</th>
                     <th>Actions</th>
                   </tr>
                 </thead>
+
                 <tbody>
                   {filteredAppointments.length === 0 ? (
                     <tr>
@@ -965,23 +992,29 @@ export default function AdminDashboard() {
                           })()}
                         </td>
                         <td>
-                          <span 
-                            style={{ 
-                              fontSize: '0.72rem', 
-                              fontFamily: 'var(--font-mono)', 
-                              color: '#a5b4fc',
-                              maxWidth: '140px',
-                              display: 'inline-block',
-                              overflow: 'hidden',
-                              textOverflow: 'ellipsis',
-                              whiteSpace: 'nowrap'
+                          <button
+                            onClick={() => setReviewDrawerAppt(appt)}
+                            className="btn btn-secondary btn-sm"
+                            style={{
+                              padding: '5px 10px',
+                              fontSize: '0.78rem',
+                              background: appt.resumeUrl ? 'rgba(99, 102, 241, 0.25)' : 'rgba(255, 255, 255, 0.04)',
+                              borderColor: appt.resumeUrl ? '#818cf8' : 'rgba(255, 255, 255, 0.1)',
+                              color: appt.resumeUrl ? '#c7d2fe' : '#94a3b8',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '5px',
+                              fontWeight: 600,
+                              boxShadow: appt.resumeUrl ? '0 2px 8px rgba(99, 102, 241, 0.2)' : 'none'
                             }}
-                            title={appt.calendlyEventId}
+                            title="Open candidate resume PDF & review drawer"
                           >
-                            {appt.calendlyEventId ? appt.calendlyEventId.split('/').pop() : 'Calendly ID'}
-                          </span>
+                            <FileText size={13} color={appt.resumeUrl ? '#818cf8' : 'currentColor'} />
+                            <span>{appt.resumeUrl ? 'View Resume' : 'Resume Dossier'}</span>
+                          </button>
                         </td>
                         <td>
+
                           {(() => {
                             const effectiveStatus = getEffectiveAppointmentStatus(appt);
                             return (
@@ -1359,6 +1392,7 @@ export default function AdminDashboard() {
                     <th>Target Roles</th>
                     <th>Appointments Booked</th>
                     <th>Last Booking Date</th>
+                    <th>Resume (PDF)</th>
                     <th>Status</th>
                   </tr>
                 </thead>
@@ -1379,6 +1413,80 @@ export default function AdminDashboard() {
                       </td>
                       <td>{st.lastAppointmentDate || 'None'}</td>
                       <td>
+                        {st.resumeUrl ? (
+                          <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                            <button
+                              onClick={() => setReviewDrawerAppt({
+                                studentName: st.name,
+                                studentEmail: st.email,
+                                resumeUrl: st.resumeUrl,
+                                resumeFileName: st.resumeFileName || 'Resume.pdf',
+                                githubUrl: st.githubUrl || '',
+                                linkedinUrl: st.linkedinUrl || '',
+                                portfolioUrl: st.portfolioUrl || '',
+                                sessionTitle: 'Registered Candidate Dossier',
+                                date: st.lastAppointmentDate || 'Registered Student',
+                                startTime: 'On-Demand Review',
+                                duration: 15
+                              })}
+                              className="btn btn-secondary btn-sm"
+                              style={{
+                                padding: '5px 10px',
+                                fontSize: '0.78rem',
+                                background: 'rgba(99, 102, 241, 0.2)',
+                                borderColor: '#818cf8',
+                                color: '#a5b4fc',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '5px',
+                                fontWeight: 600
+                              }}
+                              title="View uploaded student resume PDF"
+                            >
+                              <FileText size={13} color="#818cf8" />
+                              <span>View Resume</span>
+                            </button>
+                            <a
+                              href={getFileUrl(st.resumeUrl)}
+                              download={st.resumeFileName || 'Candidate_Resume.pdf'}
+                              className="btn btn-outline btn-sm"
+                              style={{ padding: '5px 8px', fontSize: '0.78rem' }}
+                              title="Download PDF directly"
+                            >
+                              <Download size={13} />
+                            </a>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => setReviewDrawerAppt({
+                              studentName: st.name,
+                              studentEmail: st.email,
+                              resumeUrl: '',
+                              resumeFileName: '',
+                              githubUrl: st.githubUrl || '',
+                              linkedinUrl: st.linkedinUrl || '',
+                              portfolioUrl: st.portfolioUrl || '',
+                              sessionTitle: 'Registered Candidate Dossier',
+                              date: st.lastAppointmentDate || 'Registered Student',
+                              startTime: 'On-Demand Review',
+                              duration: 15
+                            })}
+                            className="btn btn-secondary btn-sm"
+                            style={{
+                              padding: '4px 8px',
+                              fontSize: '0.74rem',
+                              color: 'var(--text-dim)',
+                              background: 'transparent',
+                              border: '1px dashed rgba(255, 255, 255, 0.15)'
+                            }}
+                            title="Attach PDF on behalf of candidate"
+                          >
+                            <Upload size={12} style={{ marginRight: '4px' }} />
+                            <span>Attach PDF</span>
+                          </button>
+                        )}
+                      </td>
+                      <td>
                         {st.lastAppointmentStatus === 'SCHEDULED' ? (
                           <span className="badge badge-success">Active Booking</span>
                         ) : (
@@ -1388,6 +1496,7 @@ export default function AdminDashboard() {
                     </tr>
                   ))}
                 </tbody>
+
               </table>
             </div>
           </div>
