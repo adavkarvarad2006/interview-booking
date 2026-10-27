@@ -1,11 +1,51 @@
 const Appointment = require('../models/Appointment');
 const Notification = require('../models/Notification');
+const User = require('../models/User');
+const Student = require('../models/Student');
 const { 
   findAppointmentConflict, 
   computeEndTime, 
   autoCompletePastAppointments, 
   hasAppointmentPassed 
 } = require('../utils/timeConflict');
+
+/**
+ * Helper to enrich an appointment with the student's profile context
+ * (resumeUrl, resumeFileName, githubUrl, linkedinUrl, portfolioUrl, targetRoles, targetCompanies)
+ */
+const enrichAppointmentWithStudentContext = async (appointment) => {
+  if (!appointment) return appointment;
+  const apptObj = appointment.toObject ? appointment.toObject() : { ...appointment };
+
+  let studentDoc = null;
+  if (apptObj.studentId) {
+    studentDoc = await Student.findOne({ userId: apptObj.studentId });
+  }
+  if (!studentDoc && apptObj.studentEmail) {
+    const user = await User.findOne({ email: apptObj.studentEmail.toLowerCase() });
+    if (user) {
+      studentDoc = await Student.findOne({ userId: user._id });
+    }
+  }
+
+  if (studentDoc) {
+    apptObj.resumeUrl = apptObj.resumeUrl || studentDoc.resumeUrl || '';
+    apptObj.resumeFileName = apptObj.resumeFileName || studentDoc.resumeFileName || (apptObj.resumeUrl ? apptObj.resumeUrl.split('/').pop() : '');
+    apptObj.githubUrl = apptObj.githubUrl || studentDoc.githubUrl || '';
+    apptObj.linkedinUrl = apptObj.linkedinUrl || studentDoc.linkedinUrl || '';
+    apptObj.portfolioUrl = apptObj.portfolioUrl || studentDoc.portfolioUrl || '';
+    apptObj.targetRoles = (apptObj.targetRoles && apptObj.targetRoles.length > 0) ? apptObj.targetRoles : (studentDoc.targetRoles || []);
+    apptObj.targetCompanies = (apptObj.targetCompanies && apptObj.targetCompanies.length > 0) ? apptObj.targetCompanies : (studentDoc.targetCompanies || []);
+    apptObj.education = apptObj.education || studentDoc.education || '';
+    apptObj.experienceLevel = apptObj.experienceLevel || studentDoc.experienceLevel || '';
+  }
+
+  return apptObj;
+};
+
+const enrichAppointments = async (appointments) => {
+  return Promise.all(appointments.map(enrichAppointmentWithStudentContext));
+};
 
 // @desc    Get appointments for the logged-in student
 // @route   GET /api/appointments/my
@@ -24,10 +64,12 @@ const getMyAppointments = async (req, res) => {
       .populate('sessionId')
       .sort({ createdAt: -1 });
 
+    const enriched = await enrichAppointments(appointments);
+
     res.json({
       success: true,
-      count: appointments.length,
-      data: appointments
+      count: enriched.length,
+      data: enriched
     });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -66,13 +108,14 @@ const getAllAppointments = async (req, res) => {
       .limit(Number(limit));
 
     const total = await Appointment.countDocuments(filter);
+    const enriched = await enrichAppointments(appointments);
 
     res.json({
       success: true,
       total,
-      count: appointments.length,
+      count: enriched.length,
       page: Number(page),
-      data: appointments
+      data: enriched
     });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -107,9 +150,11 @@ const getAppointmentById = async (req, res) => {
       return res.status(403).json({ success: false, message: 'Not authorized to view this appointment' });
     }
 
+    const enriched = await enrichAppointmentWithStudentContext(appointment);
+
     res.json({
       success: true,
-      data: appointment
+      data: enriched
     });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -296,11 +341,73 @@ const rescheduleAppointment = async (req, res) => {
   }
 };
 
+// @desc    Update appointment pre-session context (resume, GitHub, LinkedIn, portfolio)
+// @route   PATCH /api/appointments/:id/context
+// @access  Private (Student or Counsellor/Admin)
+const updateAppointmentContext = async (req, res) => {
+  try {
+    const { resumeUrl, resumeFileName, githubUrl, linkedinUrl, portfolioUrl, notes } = req.body;
+    const appointment = await Appointment.findById(req.params.id);
+
+    if (!appointment) {
+      return res.status(404).json({ success: false, message: 'Appointment not found' });
+    }
+
+    const isOwner =
+      (appointment.studentId && String(appointment.studentId) === String(req.user._id)) ||
+      (appointment.studentEmail && appointment.studentEmail.toLowerCase() === req.user.email.toLowerCase());
+    const isStaff = ['ADMIN', 'COUNSELLOR'].includes(req.user.role);
+
+    if (!isOwner && !isStaff) {
+      return res.status(403).json({ success: false, message: 'Not authorized to update this appointment context' });
+    }
+
+    if (resumeUrl !== undefined) appointment.resumeUrl = resumeUrl;
+    if (resumeFileName !== undefined) appointment.resumeFileName = resumeFileName;
+    if (githubUrl !== undefined) appointment.githubUrl = githubUrl;
+    if (linkedinUrl !== undefined) appointment.linkedinUrl = linkedinUrl;
+    if (portfolioUrl !== undefined) appointment.portfolioUrl = portfolioUrl;
+    if (notes !== undefined) appointment.notes = notes;
+
+    await appointment.save();
+
+    // Also update Student profile if student is updating
+    if (req.user.role === 'STUDENT') {
+      const studentUpdates = {};
+      if (resumeUrl !== undefined) studentUpdates.resumeUrl = resumeUrl;
+      if (resumeFileName !== undefined) studentUpdates.resumeFileName = resumeFileName;
+      if (githubUrl !== undefined) studentUpdates.githubUrl = githubUrl;
+      if (linkedinUrl !== undefined) studentUpdates.linkedinUrl = linkedinUrl;
+      if (portfolioUrl !== undefined) studentUpdates.portfolioUrl = portfolioUrl;
+
+      if (Object.keys(studentUpdates).length > 0) {
+        await Student.findOneAndUpdate(
+          { userId: req.user._id },
+          { $set: studentUpdates },
+          { upsert: true }
+        );
+      }
+    }
+
+    const enriched = await enrichAppointmentWithStudentContext(appointment);
+
+    res.json({
+      success: true,
+      message: 'Pre-session context updated successfully',
+      data: enriched
+    });
+  } catch (error) {
+    console.error('[Update Appointment Context Error]:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 module.exports = {
   getMyAppointments,
   getAllAppointments,
   getAppointmentById,
   updateAppointmentStatus,
   cancelAppointment,
-  rescheduleAppointment
+  rescheduleAppointment,
+  updateAppointmentContext
 };

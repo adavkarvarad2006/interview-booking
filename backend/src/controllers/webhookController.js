@@ -177,6 +177,12 @@ const handleCalendlyWebhook = async (req, res) => {
         });
       }
 
+      // Retrieve existing student profile details if available
+      let existingStudentProfile = null;
+      if (studentUser) {
+        existingStudentProfile = await Student.findOne({ userId: studentUser._id });
+      }
+
       // Upsert appointment record (idempotency by calendlyInviteeId)
       const appointment = await Appointment.findOneAndUpdate(
         { calendlyInviteeId: inviteeUri },
@@ -193,6 +199,11 @@ const handleCalendlyWebhook = async (req, res) => {
           studentName,
           studentEmail,
           notes,
+          resumeUrl: payload.resumeUrl || existingStudentProfile?.resumeUrl || '',
+          resumeFileName: payload.resumeFileName || existingStudentProfile?.resumeFileName || '',
+          githubUrl: payload.githubUrl || existingStudentProfile?.githubUrl || '',
+          linkedinUrl: payload.linkedinUrl || existingStudentProfile?.linkedinUrl || '',
+          portfolioUrl: payload.portfolioUrl || existingStudentProfile?.portfolioUrl || '',
           sessionTitle: matchedSession ? matchedSession.title : eventName,
           sessionType: matchedSession ? matchedSession.sessionType : sessionType,
           rescheduleUrl,
@@ -317,7 +328,12 @@ const simulateWebhook = async (req, res) => {
       duration = 15,
       date = '2026-10-15',
       time = '14:30',
-      reason = 'Personal rescheduling'
+      reason = 'Personal rescheduling',
+      resumeUrl = '',
+      resumeFileName = '',
+      githubUrl = '',
+      linkedinUrl = '',
+      portfolioUrl = ''
     } = req.body;
 
     const mockEventId = `sim_evt_${Date.now()}`;
@@ -372,6 +388,11 @@ const simulateWebhook = async (req, res) => {
         endTime: computedEnd,
         reschedule_url: '',
         cancel_url: '',
+        resumeUrl,
+        resumeFileName,
+        githubUrl,
+        linkedinUrl,
+        portfolioUrl,
         scheduled_event: {
           uri: `https://api.calendly.com/scheduled_events/${mockEventId}`,
           name: sessionTitle,

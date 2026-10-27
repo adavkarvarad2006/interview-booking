@@ -1,6 +1,9 @@
+const fs = require('fs');
+const path = require('path');
 const User = require('../models/User');
 const Student = require('../models/Student');
 const Counsellor = require('../models/Counsellor');
+const Appointment = require('../models/Appointment');
 const Otp = require('../models/Otp');
 const { sendOtpEmail } = require('../services/emailService');
 const jwt = require('jsonwebtoken');
@@ -201,6 +204,108 @@ const updateProfile = async (req, res) => {
   }
 };
 
+// @desc    Upload student resume (PDF format)
+// @route   POST /api/auth/upload-resume
+// @access  Private (Student/User)
+const uploadResume = async (req, res) => {
+  try {
+    const { fileName, fileData, appointmentId } = req.body;
+    if (!fileData) {
+      return res.status(400).json({ success: false, message: 'No file data received' });
+    }
+
+    // Extract base64 content
+    let base64Content = fileData;
+    if (fileData.includes('base64,')) {
+      base64Content = fileData.split('base64,')[1];
+    }
+
+    const buffer = Buffer.from(base64Content, 'base64');
+
+    // File size check (max 12MB)
+    if (buffer.length > 12 * 1024 * 1024) {
+      return res.status(400).json({ success: false, message: 'Resume file size exceeds maximum limit of 12MB' });
+    }
+
+    const uploadsDir = path.join(__dirname, '../../uploads/resumes');
+    if (!fs.existsSync(uploadsDir)) {
+      fs.mkdirSync(uploadsDir, { recursive: true });
+    }
+
+    // Clean original filename
+    const origName = (fileName || 'resume.pdf').replace(/[^a-zA-Z0-9._-]/g, '_');
+    const ext = path.extname(origName) || '.pdf';
+    const timestamp = Date.now();
+    const safeFileName = `resume_${req.user._id}_${timestamp}${ext}`;
+    const filePath = path.join(uploadsDir, safeFileName);
+
+    await fs.promises.writeFile(filePath, buffer);
+    const resumeUrl = `/uploads/resumes/${safeFileName}`;
+    const originalDisplayName = fileName || origName;
+
+    // Save to Student profile
+    await Student.findOneAndUpdate(
+      { userId: req.user._id },
+      { 
+        $set: { 
+          resumeUrl, 
+          resumeFileName: originalDisplayName 
+        } 
+      },
+      { upsert: true, new: true }
+    );
+
+    // If appointmentId provided, also attach to that appointment
+    if (appointmentId) {
+      await Appointment.findByIdAndUpdate(
+        appointmentId,
+        {
+          $set: {
+            resumeUrl,
+            resumeFileName: originalDisplayName
+          }
+        }
+      );
+    }
+
+    res.json({
+      success: true,
+      message: 'Resume uploaded successfully',
+      data: {
+        resumeUrl,
+        resumeFileName: originalDisplayName
+      }
+    });
+  } catch (error) {
+    console.error('[Upload Resume Error]', error);
+    res.status(500).json({ success: false, message: error.message || 'Failed to save resume' });
+  }
+};
+
+// @desc    Delete/Remove student resume
+// @route   DELETE /api/auth/resume
+// @access  Private (Student)
+const deleteResume = async (req, res) => {
+  try {
+    await Student.findOneAndUpdate(
+      { userId: req.user._id },
+      { 
+        $set: { 
+          resumeUrl: '', 
+          resumeFileName: '' 
+        } 
+      }
+    );
+
+    res.json({
+      success: true,
+      message: 'Resume removed successfully'
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 // @desc    Send OTP to user email for passwordless login
 // @route   POST /api/auth/send-otp
 // @access  Public
@@ -362,6 +467,8 @@ module.exports = {
   loginUser,
   getMe,
   updateProfile,
+  uploadResume,
+  deleteResume,
   sendOtp,
   verifyOtp
 };

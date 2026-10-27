@@ -3,6 +3,7 @@ import { api } from '../services/api';
 import WebhookSimulatorModal from '../components/WebhookSimulatorModal';
 import RescheduleModal from '../components/RescheduleModal';
 import CancelModal from '../components/CancelModal';
+import AdminReviewDrawer from '../components/AdminReviewDrawer';
 import { 
   LayoutDashboard, 
   Calendar, 
@@ -25,7 +26,8 @@ import {
   Layers,
   CalendarX,
   UserCheck,
-  Video
+  Video,
+  FileText
 } from 'lucide-react';
 import { 
   getEffectiveAppointmentStatus, 
@@ -66,6 +68,9 @@ export default function AdminDashboard() {
   const [rescheduleModalOpen, setRescheduleModalOpen] = useState(false);
   const [cancelModalOpen, setCancelModalOpen] = useState(false);
   const [selectedAppointment, setSelectedAppointment] = useState(null);
+
+  // Admin Review Drawer state for pre-session resume / portfolio context
+  const [reviewDrawerAppt, setReviewDrawerAppt] = useState(null);
 
   // Profile Edit state
   const [profileSaving, setProfileSaving] = useState(false);
@@ -500,51 +505,75 @@ export default function AdminDashboard() {
                       </div>
 
                       {/* Action Buttons: Join Meet & Controls */}
-                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center', paddingTop: '4px' }}>
-                        <a
-                          href={appt.googleMeetLink || appt.meetUrl || 'https://meet.google.com/new'}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="btn btn-primary btn-sm"
-                          style={{ 
-                            flex: 1, 
-                            justifyContent: 'center', 
-                            fontSize: '0.82rem', 
-                            padding: '10px',
-                            background: 'linear-gradient(135deg, #10b981, #059669)',
-                            border: 'none',
-                            fontWeight: 700
-                          }}
-                        >
-                          <Video size={15} />
-                          <span>Join Google Meet</span>
-                        </a>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', paddingTop: '4px' }}>
+                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                          <a
+                            href={appt.googleMeetLink || appt.meetUrl || 'https://meet.google.com/new'}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="btn btn-primary btn-sm"
+                            style={{ 
+                              flex: 1, 
+                              justifyContent: 'center', 
+                              fontSize: '0.82rem', 
+                              padding: '10px',
+                              background: 'linear-gradient(135deg, #10b981, #059669)',
+                              border: 'none',
+                              fontWeight: 700
+                            }}
+                          >
+                            <Video size={15} />
+                            <span>Join Google Meet</span>
+                          </a>
 
-                        <button
-                          onClick={() => {
-                            setSelectedAppointment(appt);
-                            setRescheduleModalOpen(true);
-                          }}
-                          className="btn btn-secondary btn-sm"
-                          style={{ padding: '9px 12px', fontSize: '0.78rem' }}
-                          title="Reschedule this session"
-                        >
-                          <Clock size={14} />
-                          <span>Reschedule</span>
-                        </button>
+                          <button
+                            onClick={() => setReviewDrawerAppt(appt)}
+                            className="btn btn-secondary btn-sm"
+                            style={{
+                              padding: '10px 14px',
+                              fontSize: '0.82rem',
+                              background: 'rgba(99, 102, 241, 0.15)',
+                              borderColor: 'rgba(99, 102, 241, 0.4)',
+                              color: '#a5b4fc',
+                              fontWeight: 600,
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '6px'
+                            }}
+                            title="View student resume (PDF), portfolio & LinkedIn links"
+                          >
+                            <FileText size={15} />
+                            <span>View Resume</span>
+                          </button>
+                        </div>
 
-                        <button
-                          onClick={() => {
-                            setSelectedAppointment(appt);
-                            setCancelModalOpen(true);
-                          }}
-                          className="btn btn-secondary btn-sm"
-                          style={{ padding: '9px 12px', fontSize: '0.78rem', color: '#f43f5e' }}
-                          title="Cancel this session"
-                        >
-                          <CalendarX size={14} />
-                          <span>Cancel</span>
-                        </button>
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                          <button
+                            onClick={() => {
+                              setSelectedAppointment(appt);
+                              setRescheduleModalOpen(true);
+                            }}
+                            className="btn btn-secondary btn-sm"
+                            style={{ flex: 1, justifyContent: 'center', padding: '8px', fontSize: '0.78rem' }}
+                            title="Reschedule this session"
+                          >
+                            <Clock size={13} style={{ marginRight: '4px' }} />
+                            <span>Reschedule</span>
+                          </button>
+
+                          <button
+                            onClick={() => {
+                              setSelectedAppointment(appt);
+                              setCancelModalOpen(true);
+                            }}
+                            className="btn btn-secondary btn-sm"
+                            style={{ flex: 1, justifyContent: 'center', padding: '8px', fontSize: '0.78rem', color: '#f43f5e' }}
+                            title="Cancel this session"
+                          >
+                            <CalendarX size={13} style={{ marginRight: '4px' }} />
+                            <span>Cancel</span>
+                          </button>
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -795,7 +824,26 @@ export default function AdminDashboard() {
                           </a>
                         </td>
                         <td>
-                          <div style={{ display: 'flex', gap: '6px' }}>
+                          <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                            <button
+                              onClick={() => setReviewDrawerAppt(appt)}
+                              className="btn btn-secondary btn-sm"
+                              style={{ 
+                                padding: '6px 10px', 
+                                fontSize: '0.75rem', 
+                                background: 'rgba(99, 102, 241, 0.15)', 
+                                borderColor: 'rgba(99, 102, 241, 0.4)', 
+                                color: '#a5b4fc', 
+                                display: 'inline-flex', 
+                                alignItems: 'center', 
+                                gap: '4px',
+                                fontWeight: 600
+                              }}
+                              title="View student resume & prep context"
+                            >
+                              <FileText size={12} />
+                              <span>Resume</span>
+                            </button>
                             <button
                               onClick={() => {
                                 setSelectedAppointment(appt);
@@ -938,6 +986,26 @@ export default function AdminDashboard() {
                             const effectiveStatus = getEffectiveAppointmentStatus(appt);
                             return (
                               <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+                                <button
+                                  onClick={() => setReviewDrawerAppt(appt)}
+                                  className="btn btn-secondary btn-sm"
+                                  style={{
+                                    padding: '4px 8px',
+                                    fontSize: '0.75rem',
+                                    background: 'rgba(99, 102, 241, 0.15)',
+                                    borderColor: 'rgba(99, 102, 241, 0.4)',
+                                    color: '#a5b4fc',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '4px',
+                                    fontWeight: 600
+                                  }}
+                                  title="View student resume & dossier"
+                                >
+                                  <FileText size={12} />
+                                  Resume
+                                </button>
+
                                 {appt.googleMeetLink && effectiveStatus === 'SCHEDULED' && (
                                   <a
                                     href={appt.googleMeetLink}
@@ -1492,6 +1560,23 @@ export default function AdminDashboard() {
         appointment={selectedAppointment}
         onSuccess={() => {
           loadDashboardData();
+        }}
+      />
+
+      {/* Admin Review Drawer (Pre-Session Context & Resume) */}
+      <AdminReviewDrawer
+        isOpen={!!reviewDrawerAppt}
+        onClose={() => setReviewDrawerAppt(null)}
+        appointment={reviewDrawerAppt}
+        onUpdateAppointment={(updatedAppt) => {
+          setReviewDrawerAppt(updatedAppt);
+          setAppointments((prev) =>
+            prev.map((a) => (a._id === updatedAppt._id ? { ...a, ...updatedAppt } : a))
+          );
+        }}
+        onOpenReschedule={(appt) => {
+          setSelectedAppointment(appt);
+          setRescheduleModalOpen(true);
         }}
       />
 

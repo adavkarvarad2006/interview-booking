@@ -39,6 +39,8 @@ export const api = {
   verifyOtp: (data) => request('/auth/verify-otp', { method: 'POST', body: JSON.stringify(data) }),
   getMe: () => request('/auth/me'),
   updateProfile: (data) => request('/auth/profile', { method: 'PUT', body: JSON.stringify(data) }),
+  uploadResume: (data) => request('/auth/upload-resume', { method: 'POST', body: JSON.stringify(data) }),
+  deleteResume: () => request('/auth/resume', { method: 'DELETE' }),
 
   // Sessions
   getPublicSessions: () => request('/sessions'),
@@ -53,6 +55,7 @@ export const api = {
   getAllAppointments: (params = '') => request(`/appointments${params ? `?${params}` : ''}`),
   getAppointment: (id) => request(`/appointments/${id}`),
   updateAppointmentStatus: (id, data) => request(`/appointments/${id}/status`, { method: 'PATCH', body: JSON.stringify(data) }),
+  updateAppointmentContext: (id, data) => request(`/appointments/${id}/context`, { method: 'PATCH', body: JSON.stringify(data) }),
   cancelAppointment: (id, data = {}) => request(`/appointments/${id}/cancel`, { method: 'POST', body: JSON.stringify(data) }),
   rescheduleAppointment: (id, data) => request(`/appointments/${id}/reschedule`, { method: 'POST', body: JSON.stringify(data) }),
 

@@ -30,3 +30,7 @@ pnpm-debug.log*
 Thumbs.db
 .vscode/
 .idea/
+
+# Uploaded candidate files
+backend/uploads/*
+!backend/uploads/.gitkeep

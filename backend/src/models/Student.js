@@ -33,6 +33,22 @@ const studentSchema = new mongoose.Schema(
       type: String,
       default: ''
     },
+    resumeFileName: {
+      type: String,
+      default: ''
+    },
+    githubUrl: {
+      type: String,
+      default: ''
+    },
+    linkedinUrl: {
+      type: String,
+      default: ''
+    },
+    portfolioUrl: {
+      type: String,
+      default: ''
+    },
     preparationNotes: {
       type: String,
       default: ''

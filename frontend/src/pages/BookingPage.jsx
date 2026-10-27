@@ -13,7 +13,11 @@ import {
   Info, 
   AlertTriangle,
   ArrowRight,
-  Sparkles
+  Sparkles,
+  FileText,
+  Upload,
+  Globe,
+  ExternalLink
 } from 'lucide-react';
 
 export default function BookingPage() {
@@ -29,6 +33,14 @@ export default function BookingPage() {
   const [loading, setLoading] = useState(true);
   const [blockedDates, setBlockedDates] = useState([]);
 
+  // Pre-session Resume & Portfolio Context State
+  const [resumeUrl, setResumeUrl] = useState('');
+  const [resumeFileName, setResumeFileName] = useState('');
+  const [githubUrl, setGithubUrl] = useState('');
+  const [linkedinUrl, setLinkedinUrl] = useState('');
+  const [uploadingResume, setUploadingResume] = useState(false);
+  const [resumeSavedMsg, setResumeSavedMsg] = useState('');
+
   // Default URLs from Vite environment variables
   const env15Url = import.meta.env.VITE_CALENDLY_15_MIN_URL || 'https://calendly.com/interview-counsellor/15-min-interview-counselling';
   const env30Url = import.meta.env.VITE_CALENDLY_30_MIN_URL || 'https://calendly.com/interview-counsellor/30-min-mock-interview-training';
@@ -36,15 +48,22 @@ export default function BookingPage() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [sessRes, counsRes, blockedRes] = await Promise.all([
+        const [sessRes, counsRes, blockedRes, meRes] = await Promise.all([
           api.getPublicSessions(),
           api.getCounsellorProfile(),
-          api.getBlockedDates()
+          api.getBlockedDates(),
+          api.getMe().catch(() => null)
         ]);
 
         if (sessRes.success) setSessions(sessRes.data);
         if (counsRes.success) setCounsellor(counsRes.data);
         if (blockedRes.success) setBlockedDates(blockedRes.data);
+        if (meRes?.success && meRes?.data?.profile) {
+          if (meRes.data.profile.resumeUrl) setResumeUrl(meRes.data.profile.resumeUrl);
+          if (meRes.data.profile.resumeFileName) setResumeFileName(meRes.data.profile.resumeFileName);
+          if (meRes.data.profile.githubUrl) setGithubUrl(meRes.data.profile.githubUrl);
+          if (meRes.data.profile.linkedinUrl) setLinkedinUrl(meRes.data.profile.linkedinUrl);
+        }
       } catch (err) {
         console.error('Error fetching booking data:', err);
       } finally {
@@ -80,6 +99,43 @@ export default function BookingPage() {
     setSearchParams({ duration: dur.toString() });
   };
 
+  const handleResumeUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf')) {
+      alert('Please select a valid PDF document.');
+      return;
+    }
+
+    if (file.size > 12 * 1024 * 1024) {
+      alert('File size exceeds the 12MB limit.');
+      return;
+    }
+
+    setUploadingResume(true);
+    const reader = new FileReader();
+    reader.onload = async () => {
+      try {
+        const res = await api.uploadResume({
+          fileName: file.name,
+          fileData: reader.result
+        });
+        if (res.success && res.data) {
+          setResumeUrl(res.data.resumeUrl);
+          setResumeFileName(res.data.resumeFileName);
+          setResumeSavedMsg('Resume PDF attached to session!');
+          setTimeout(() => setResumeSavedMsg(''), 4000);
+        }
+      } catch (err) {
+        alert(err.message || 'Failed to upload resume');
+      } finally {
+        setUploadingResume(false);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
   // Handler when Calendly or Direct Scheduler reports a completed booking
   const handleBookingCompleted = async (eventData) => {
     console.log('[BookingPage] Booking event received:', eventData);
@@ -88,6 +144,16 @@ export default function BookingPage() {
     const bookingTime = eventData.time || '10:00 AM';
     const sName = eventData.studentName || (user ? user.name : 'Student');
     const sEmail = eventData.studentEmail || (user ? user.email : 'student@example.com');
+
+    // Also update student profile with any entered GitHub/LinkedIn links
+    if (user && (githubUrl || linkedinUrl)) {
+      api.updateProfile({
+        studentDetails: {
+          githubUrl: githubUrl.trim(),
+          linkedinUrl: linkedinUrl.trim()
+        }
+      }).catch(err => console.warn('Non-blocking profile update:', err));
+    }
 
     let googleMeetLink = '';
 
@@ -101,7 +167,11 @@ export default function BookingPage() {
           duration: selectedDuration,
           date: bookingDate,
           time: bookingTime,
-          reason: eventData.notes || '1-on-1 Interview Mentorship Session'
+          reason: eventData.notes || '1-on-1 Interview Mentorship Session',
+          resumeUrl,
+          resumeFileName,
+          githubUrl,
+          linkedinUrl
         });
         if (webhookRes?.googleMeetLink) {
           googleMeetLink = webhookRes.googleMeetLink;
@@ -273,6 +343,123 @@ export default function BookingPage() {
                   </li>
                 ))}
               </ul>
+            </div>
+
+            {/* Pre-Session Context Card: Attach Resume & Portfolio */}
+            <div className="glass-panel" style={{ padding: '24px', border: '1px solid rgba(99, 102, 241, 0.3)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                <FileText size={18} color="#818cf8" />
+                <h3 style={{ fontSize: '1.1rem', color: '#fff', margin: 0 }}>
+                  Pre-Session Context (Optional)
+                </h3>
+              </div>
+              <p style={{ color: 'var(--text-muted)', fontSize: '0.82rem', marginBottom: '16px', lineHeight: '1.5' }}>
+                Upload your resume (PDF) or paste GitHub/LinkedIn links so Dr. Parkavi A. can review them before your session.
+              </p>
+
+              {/* Resume Upload Status */}
+              <div style={{ marginBottom: '14px' }}>
+                {resumeUrl ? (
+                  <div
+                    style={{
+                      padding: '10px 14px',
+                      background: 'rgba(16, 185, 129, 0.1)',
+                      border: '1px solid rgba(16, 185, 129, 0.3)',
+                      borderRadius: '8px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: '10px'
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden' }}>
+                      <CheckCircle size={15} color="#10b981" style={{ flexShrink: 0 }} />
+                      <span style={{ fontSize: '0.8rem', color: '#fff', fontWeight: 600, textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
+                        {resumeFileName || 'Resume.pdf'}
+                      </span>
+                    </div>
+                    <label
+                      style={{
+                        fontSize: '0.74rem',
+                        color: '#a5b4fc',
+                        cursor: 'pointer',
+                        textDecoration: 'underline',
+                        whiteSpace: 'nowrap'
+                      }}
+                    >
+                      Change
+                      <input
+                        type="file"
+                        accept=".pdf,application/pdf"
+                        onChange={handleResumeUpload}
+                        disabled={uploadingResume}
+                        style={{ display: 'none' }}
+                      />
+                    </label>
+                  </div>
+                ) : (
+                  <label
+                    className="btn btn-secondary btn-sm"
+                    style={{
+                      width: '100%',
+                      justifyContent: 'center',
+                      cursor: uploadingResume ? 'not-allowed' : 'pointer',
+                      fontSize: '0.8rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px'
+                    }}
+                  >
+                    <Upload size={14} />
+                    <span>{uploadingResume ? 'Attaching PDF...' : 'Attach Resume (PDF)'}</span>
+                    <input
+                      type="file"
+                      accept=".pdf,application/pdf"
+                      onChange={handleResumeUpload}
+                      disabled={uploadingResume}
+                      style={{ display: 'none' }}
+                    />
+                  </label>
+                )}
+                {resumeSavedMsg && (
+                  <div style={{ fontSize: '0.75rem', color: '#10b981', marginTop: '4px' }}>
+                    {resumeSavedMsg}
+                  </div>
+                )}
+              </div>
+
+              {/* GitHub & LinkedIn Inputs */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.76rem', color: '#cbd5e1', marginBottom: '4px' }}>
+                    <Globe size={12} color="#818cf8" />
+                    <span>GitHub Profile URL</span>
+                  </div>
+                  <input
+                    type="url"
+                    placeholder="https://github.com/username"
+                    value={githubUrl}
+                    onChange={(e) => setGithubUrl(e.target.value)}
+                    className="form-control"
+                    style={{ fontSize: '0.8rem', padding: '6px 10px' }}
+                  />
+                </div>
+
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.76rem', color: '#cbd5e1', marginBottom: '4px' }}>
+                    <Globe size={12} color="#38bdf8" />
+                    <span>LinkedIn Profile URL</span>
+                  </div>
+                  <input
+                    type="url"
+                    placeholder="https://linkedin.com/in/username"
+                    value={linkedinUrl}
+                    onChange={(e) => setLinkedinUrl(e.target.value)}
+                    className="form-control"
+                    style={{ fontSize: '0.8rem', padding: '6px 10px' }}
+                  />
+                </div>
+              </div>
             </div>
 
             {/* Blocked Dates Notice */}

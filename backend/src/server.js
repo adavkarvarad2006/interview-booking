@@ -40,14 +40,28 @@ app.use(cors({
   credentials: true
 }));
 
-// We parse raw body or JSON
+// Configure uploads directory for resumes & documents
+const uploadsDir = path.join(__dirname, '../uploads');
+const resumesDir = path.join(uploadsDir, 'resumes');
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+}
+if (!fs.existsSync(resumesDir)) {
+  fs.mkdirSync(resumesDir, { recursive: true });
+}
+
+// Serve uploaded documents statically
+app.use('/uploads', express.static(uploadsDir));
+
+// We parse raw body or JSON (supports base64 PDF uploads up to 15MB)
 app.use(express.json({
+  limit: '15mb',
   verify: (req, res, buf) => {
     // Keep rawBody if needed for webhook verification
     req.rawBody = buf.toString();
   }
 }));
-app.use(express.urlencoded({ extended: true }));
+app.use(express.urlencoded({ extended: true, limit: '15mb' }));
 
 // Request logging in development
 if (process.env.NODE_ENV === 'development') {

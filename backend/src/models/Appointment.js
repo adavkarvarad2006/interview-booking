@@ -60,6 +60,26 @@ const appointmentSchema = new mongoose.Schema(
       type: String,
       default: ''
     },
+    resumeUrl: {
+      type: String,
+      default: ''
+    },
+    resumeFileName: {
+      type: String,
+      default: ''
+    },
+    githubUrl: {
+      type: String,
+      default: ''
+    },
+    linkedinUrl: {
+      type: String,
+      default: ''
+    },
+    portfolioUrl: {
+      type: String,
+      default: ''
+    },
     sessionTitle: {
       type: String,
       default: 'Interview Counselling Session'

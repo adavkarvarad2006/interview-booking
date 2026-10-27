@@ -5,6 +5,8 @@ const {
   loginUser, 
   getMe, 
   updateProfile,
+  uploadResume,
+  deleteResume,
   sendOtp,
   verifyOtp
 } = require('../controllers/authController');
@@ -16,5 +18,7 @@ router.post('/send-otp', sendOtp);
 router.post('/verify-otp', verifyOtp);
 router.get('/me', protect, getMe);
 router.put('/profile', protect, updateProfile);
+router.post('/upload-resume', protect, uploadResume);
+router.delete('/resume', protect, deleteResume);
 
 module.exports = router;
