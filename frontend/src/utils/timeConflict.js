@@ -50,3 +50,83 @@ export function isSlotBooked(slotTimeStr, bookedList = [], duration = 15) {
     return Math.max(slotStart, bStart) < Math.min(slotEnd, bEnd);
   });
 }
+
+/**
+ * Compute the JavaScript Date object representing when an appointment ends
+ */
+export function getAppointmentEndDateTime(appt) {
+  if (!appt) return null;
+
+  // If endTime is an ISO date-time string
+  if (appt.endTime && typeof appt.endTime === 'string' && appt.endTime.includes('T')) {
+    const d = new Date(appt.endTime);
+    if (!isNaN(d.getTime())) return d;
+  }
+
+  // If startTime is an ISO date-time string
+  if (appt.startTime && typeof appt.startTime === 'string' && appt.startTime.includes('T')) {
+    const d = new Date(appt.startTime);
+    if (!isNaN(d.getTime())) {
+      const dur = Number(appt.duration) || 15;
+      return new Date(d.getTime() + dur * 60000);
+    }
+  }
+
+  if (!appt.date) return null;
+
+  const cleanDate = String(appt.date).split('T')[0].trim();
+  let endMinutes;
+
+  if (appt.endTime && appt.endTime !== appt.startTime) {
+    endMinutes = timeToMinutes(appt.endTime);
+  } else if (appt.startTime) {
+    endMinutes = timeToMinutes(appt.startTime) + (Number(appt.duration) || 15);
+  } else {
+    endMinutes = 23 * 60 + 59;
+  }
+
+  const parts = cleanDate.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})$/);
+  if (parts) {
+    const year = parseInt(parts[1], 10);
+    const month = parseInt(parts[2], 10) - 1;
+    const day = parseInt(parts[3], 10);
+    const hours = Math.floor(endMinutes / 60);
+    const minutes = endMinutes % 60;
+    return new Date(year, month, day, hours, minutes, 0, 0);
+  }
+
+  const fallback = new Date(cleanDate);
+  if (!isNaN(fallback.getTime())) {
+    fallback.setHours(Math.floor(endMinutes / 60), endMinutes % 60, 0, 0);
+    return fallback;
+  }
+
+  return null;
+}
+
+/**
+ * Returns true if the appointment's scheduled end time has passed
+ */
+export function hasAppointmentPassed(appt, now = new Date()) {
+  const end = getAppointmentEndDateTime(appt);
+  return end ? now.getTime() >= end.getTime() : false;
+}
+
+/**
+ * Get the authoritative status of an appointment.
+ * If a scheduled meet's scheduled time has passed, its status is displayed as 'COMPLETED'.
+ */
+export function getEffectiveAppointmentStatus(appt, now = new Date()) {
+  if (!appt) return 'UNKNOWN';
+  if (appt.status === 'CANCELLED') return 'CANCELLED';
+  if (appt.status === 'COMPLETED') return 'COMPLETED';
+
+  if (appt.status === 'SCHEDULED' || appt.status === 'RESCHEDULED') {
+    if (hasAppointmentPassed(appt, now)) {
+      return 'COMPLETED';
+    }
+    return appt.status;
+  }
+
+  return appt.status || 'SCHEDULED';
+}

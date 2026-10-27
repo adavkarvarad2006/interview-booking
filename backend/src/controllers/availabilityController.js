@@ -1,7 +1,7 @@
 const BlockedDate = require('../models/BlockedDate');
 const Appointment = require('../models/Appointment');
 const Notification = require('../models/Notification');
-const { normalizeTime } = require('../utils/timeConflict');
+const { normalizeTime, autoCompletePastAppointments } = require('../utils/timeConflict');
 
 // @desc    Get all blocked dates
 // @route   GET /api/availability/blocked
@@ -136,6 +136,9 @@ const getAvailabilityExplanation = (req, res) => {
 // @access  Public
 const getBookedSlots = async (req, res) => {
   try {
+    // Ensure all passed scheduled appointments are marked COMPLETED
+    await autoCompletePastAppointments(Appointment);
+
     const { date } = req.query;
     const filter = { status: 'SCHEDULED' }; // Only active scheduled sessions block availability!
 

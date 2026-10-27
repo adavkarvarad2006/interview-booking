@@ -88,6 +88,9 @@ function slotsConflict(startAStr, durA = 15, startBStr, durB = 15) {
 async function findAppointmentConflict(AppointmentModel, { date, startTime, duration = 15, excludeId = null }) {
   if (!date || !startTime) return null;
 
+  // Auto-complete any appointments that have already passed so they don't block future slots
+  await autoCompletePastAppointments(AppointmentModel);
+
   const query = {
     date: date.trim(),
     status: 'SCHEDULED' // Only currently active scheduled appointments block the counsellor
@@ -114,10 +117,129 @@ async function findAppointmentConflict(AppointmentModel, { date, startTime, dura
   return null;
 }
 
+/**
+ * Compute the JavaScript Date object representing when an appointment ends
+ */
+function getAppointmentEndDateTime(appt) {
+  if (!appt) return null;
+
+  // If endTime is already an ISO date-time string
+  if (appt.endTime && typeof appt.endTime === 'string' && appt.endTime.includes('T')) {
+    const d = new Date(appt.endTime);
+    if (!isNaN(d.getTime())) return d;
+  }
+
+  // If startTime is an ISO date-time string
+  if (appt.startTime && typeof appt.startTime === 'string' && appt.startTime.includes('T')) {
+    const d = new Date(appt.startTime);
+    if (!isNaN(d.getTime())) {
+      const dur = Number(appt.duration) || 15;
+      return new Date(d.getTime() + dur * 60000);
+    }
+  }
+
+  if (!appt.date) return null;
+
+  const cleanDate = String(appt.date).split('T')[0].trim();
+  let endMinutes;
+
+  if (appt.endTime && appt.endTime !== appt.startTime) {
+    endMinutes = timeToMinutes(appt.endTime);
+  } else if (appt.startTime) {
+    endMinutes = timeToMinutes(appt.startTime) + (Number(appt.duration) || 15);
+  } else {
+    endMinutes = 23 * 60 + 59;
+  }
+
+  const parts = cleanDate.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})$/);
+  if (parts) {
+    const year = parseInt(parts[1], 10);
+    const month = parseInt(parts[2], 10) - 1;
+    const day = parseInt(parts[3], 10);
+    const hours = Math.floor(endMinutes / 60);
+    const minutes = endMinutes % 60;
+    return new Date(year, month, day, hours, minutes, 0, 0);
+  }
+
+  const fallback = new Date(cleanDate);
+  if (!isNaN(fallback.getTime())) {
+    fallback.setHours(Math.floor(endMinutes / 60), endMinutes % 60, 0, 0);
+    return fallback;
+  }
+
+  return null;
+}
+
+/**
+ * Returns true if the appointment's scheduled end time is in the past
+ */
+function hasAppointmentPassed(appt, now = new Date()) {
+  const end = getAppointmentEndDateTime(appt);
+  return end ? now.getTime() >= end.getTime() : false;
+}
+
+/**
+ * Automatically find any SCHEDULED appointment whose scheduled time has passed
+ * and transition its status to COMPLETED in the database.
+ */
+async function autoCompletePastAppointments(AppointmentModel) {
+  try {
+    const Model = AppointmentModel || require('../models/Appointment');
+    const scheduledAppointments = await Model.find({
+      status: { $in: ['SCHEDULED', 'RESCHEDULED'] }
+    });
+
+    const now = new Date();
+    const passedIds = [];
+
+    for (const appt of scheduledAppointments) {
+      if (hasAppointmentPassed(appt, now)) {
+        passedIds.push(appt._id);
+      }
+    }
+
+    if (passedIds.length > 0) {
+      await Model.updateMany(
+        { _id: { $in: passedIds } },
+        { $set: { status: 'COMPLETED' } }
+      );
+      console.log(`[Auto-Complete] Automatically marked ${passedIds.length} passed appointment(s) as COMPLETED.`);
+    }
+
+    return passedIds.length;
+  } catch (err) {
+    console.error('[Auto-Complete Appointments Error]:', err.message);
+    return 0;
+  }
+}
+
+/**
+ * Get the authoritative status of an appointment.
+ * If a scheduled meet's scheduled time has passed, its status is displayed as 'COMPLETED'.
+ */
+function getEffectiveAppointmentStatus(appt, now = new Date()) {
+  if (!appt) return 'UNKNOWN';
+  if (appt.status === 'CANCELLED') return 'CANCELLED';
+  if (appt.status === 'COMPLETED') return 'COMPLETED';
+
+  if (appt.status === 'SCHEDULED' || appt.status === 'RESCHEDULED') {
+    if (hasAppointmentPassed(appt, now)) {
+      return 'COMPLETED';
+    }
+    return appt.status;
+  }
+
+  return appt.status || 'SCHEDULED';
+}
+
 module.exports = {
   normalizeTime,
   timeToMinutes,
   computeEndTime,
   slotsConflict,
-  findAppointmentConflict
+  findAppointmentConflict,
+  getAppointmentEndDateTime,
+  hasAppointmentPassed,
+  autoCompletePastAppointments,
+  getEffectiveAppointmentStatus
 };

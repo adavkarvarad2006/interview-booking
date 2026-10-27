@@ -27,6 +27,11 @@ import {
   UserCheck,
   Video
 } from 'lucide-react';
+import { 
+  getEffectiveAppointmentStatus, 
+  hasAppointmentPassed, 
+  getAppointmentEndDateTime 
+} from '../utils/timeConflict';
 
 export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState('dashboard'); // dashboard, appointments, sessions, availability, students, integration, profile
@@ -38,6 +43,7 @@ export default function AdminDashboard() {
   const [integration, setIntegration] = useState(null);
   const [counsellor, setCounsellor] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [, setTick] = useState(0);
 
   // Filter & Search states
   const [statusFilter, setStatusFilter] = useState('ALL');
@@ -95,11 +101,18 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     loadDashboardData();
+
+    // Auto-refresh effective statuses every 30 seconds as time passes
+    const timer = setInterval(() => {
+      setTick((t) => t + 1);
+    }, 30000);
+    return () => clearInterval(timer);
   }, []);
 
   // Filtered Appointments
   const filteredAppointments = appointments.filter((appt) => {
-    const matchesStatus = statusFilter === 'ALL' || appt.status === statusFilter;
+    const effectiveStatus = getEffectiveAppointmentStatus(appt);
+    const matchesStatus = statusFilter === 'ALL' || effectiveStatus === statusFilter;
     const matchesSearch = 
       appt.studentName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       appt.studentEmail?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -109,10 +122,13 @@ export default function AdminDashboard() {
 
   // Authoritative list of upcoming sessions Dr. Parkavi has to conduct
   const upcomingSessionsToTake = appointments
-    .filter((appt) => appt.status === 'SCHEDULED' || appt.status === 'RESCHEDULED')
+    .filter((appt) => {
+      const effectiveStatus = getEffectiveAppointmentStatus(appt);
+      return (effectiveStatus === 'SCHEDULED' || effectiveStatus === 'RESCHEDULED') && !hasAppointmentPassed(appt);
+    })
     .sort((a, b) => {
-      const dateA = new Date(`${a.date} ${a.time?.split(' - ')[0] || ''}`);
-      const dateB = new Date(`${b.date} ${b.time?.split(' - ')[0] || ''}`);
+      const dateA = getAppointmentEndDateTime(a) || new Date(a.date);
+      const dateB = getAppointmentEndDateTime(b) || new Date(b.date);
       return dateA - dateB;
     });
 
@@ -457,7 +473,7 @@ export default function AdminDashboard() {
                           </span>
                           <span className="badge badge-cyan" style={{ fontSize: '0.8rem', fontWeight: 700, padding: '4px 10px', display: 'flex', alignItems: 'center', gap: '5px' }}>
                             <Clock size={13} />
-                            {appt.time}
+                            {appt.startTime ? `${appt.startTime}${appt.endTime ? ` - ${appt.endTime}` : ''}` : appt.time || '10:00 AM'}
                           </span>
                         </div>
 
@@ -486,7 +502,7 @@ export default function AdminDashboard() {
                       {/* Action Buttons: Join Meet & Controls */}
                       <div style={{ display: 'flex', gap: '8px', alignItems: 'center', paddingTop: '4px' }}>
                         <a
-                          href={appt.meetUrl || 'https://meet.google.com/new'}
+                          href={appt.googleMeetLink || appt.meetUrl || 'https://meet.google.com/new'}
                           target="_blank"
                           rel="noreferrer"
                           className="btn btn-primary btn-sm"
@@ -641,9 +657,16 @@ export default function AdminDashboard() {
                           <span className="badge badge-cyan">{appt.duration}m</span>
                         </td>
                         <td>
-                          {appt.status === 'SCHEDULED' && <span className="badge badge-success">Scheduled</span>}
-                          {appt.status === 'COMPLETED' && <span className="badge badge-primary">Completed</span>}
-                          {appt.status === 'CANCELLED' && <span className="badge badge-danger">Cancelled</span>}
+                          {(() => {
+                            const effectiveStatus = getEffectiveAppointmentStatus(appt);
+                            return (
+                              <>
+                                {effectiveStatus === 'SCHEDULED' && <span className="badge badge-success">Scheduled</span>}
+                                {effectiveStatus === 'COMPLETED' && <span className="badge badge-primary"><CheckCircle size={11} style={{ marginRight: '3px' }} /> Completed</span>}
+                                {effectiveStatus === 'CANCELLED' && <span className="badge badge-danger">Cancelled</span>}
+                              </>
+                            );
+                          })()}
                         </td>
                       </tr>
                     ))}
@@ -725,7 +748,7 @@ export default function AdminDashboard() {
                         <td>
                           <span className="badge badge-cyan" style={{ fontSize: '0.85rem', fontWeight: 700, padding: '6px 12px', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
                             <Clock size={13} />
-                            {appt.time}
+                            {appt.startTime ? `${appt.startTime}${appt.endTime ? ` - ${appt.endTime}` : ''}` : appt.time || '10:00 AM'}
                           </span>
                         </td>
                         <td>
@@ -754,7 +777,7 @@ export default function AdminDashboard() {
                         </td>
                         <td>
                           <a
-                            href={appt.meetUrl || 'https://meet.google.com/new'}
+                            href={appt.googleMeetLink || appt.meetUrl || 'https://meet.google.com/new'}
                             target="_blank"
                             rel="noreferrer"
                             className="btn btn-primary btn-sm"
@@ -882,9 +905,16 @@ export default function AdminDashboard() {
                           <span className="badge badge-cyan">{appt.duration}m</span>
                         </td>
                         <td>
-                          {appt.status === 'SCHEDULED' && <span className="badge badge-success">SCHEDULED</span>}
-                          {appt.status === 'COMPLETED' && <span className="badge badge-primary">COMPLETED</span>}
-                          {appt.status === 'CANCELLED' && <span className="badge badge-danger">CANCELLED</span>}
+                          {(() => {
+                            const effectiveStatus = getEffectiveAppointmentStatus(appt);
+                            return (
+                              <>
+                                {effectiveStatus === 'SCHEDULED' && <span className="badge badge-success">SCHEDULED</span>}
+                                {effectiveStatus === 'COMPLETED' && <span className="badge badge-primary"><CheckCircle size={11} style={{ marginRight: '3px' }} /> COMPLETED</span>}
+                                {effectiveStatus === 'CANCELLED' && <span className="badge badge-danger">CANCELLED</span>}
+                              </>
+                            );
+                          })()}
                         </td>
                         <td>
                           <span 
@@ -904,74 +934,86 @@ export default function AdminDashboard() {
                           </span>
                         </td>
                         <td>
-                          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                            {appt.googleMeetLink && appt.status === 'SCHEDULED' && (
-                              <a
-                                href={appt.googleMeetLink}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="btn btn-sm"
-                                style={{
-                                  padding: '4px 8px',
-                                  fontSize: '0.75rem',
-                                  background: '#10b981',
-                                  borderColor: '#10b981',
-                                  color: '#fff',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  gap: '4px',
-                                  fontWeight: 600
-                                }}
-                                title="Host or join Google Meet video call"
-                              >
-                                <Video size={12} />
-                                Meet
-                              </a>
-                            )}
+                          {(() => {
+                            const effectiveStatus = getEffectiveAppointmentStatus(appt);
+                            return (
+                              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+                                {appt.googleMeetLink && effectiveStatus === 'SCHEDULED' && (
+                                  <a
+                                    href={appt.googleMeetLink}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="btn btn-sm"
+                                    style={{
+                                      padding: '4px 8px',
+                                      fontSize: '0.75rem',
+                                      background: '#10b981',
+                                      borderColor: '#10b981',
+                                      color: '#fff',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: '4px',
+                                      fontWeight: 600
+                                    }}
+                                    title="Host or join Google Meet video call"
+                                  >
+                                    <Video size={12} />
+                                    Meet
+                                  </a>
+                                )}
 
-                            {appt.status === 'SCHEDULED' && (
-                              <button
-                                onClick={() => handleUpdateStatus(appt._id, 'COMPLETED')}
-                                className="btn btn-outline btn-sm"
-                                style={{ padding: '4px 8px', fontSize: '0.75rem' }}
-                                title="Mark session as completed"
-                              >
-                                Mark Done
-                              </button>
-                            )}
+                                {effectiveStatus === 'SCHEDULED' && (
+                                  <button
+                                    onClick={() => handleUpdateStatus(appt._id, 'COMPLETED')}
+                                    className="btn btn-outline btn-sm"
+                                    style={{ padding: '4px 8px', fontSize: '0.75rem' }}
+                                    title="Mark session as completed"
+                                  >
+                                    Mark Done
+                                  </button>
+                                )}
 
-                            {appt.status === 'SCHEDULED' && (
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setSelectedAppointment(appt);
-                                  setRescheduleModalOpen(true);
-                                }}
-                                className="btn btn-secondary btn-sm"
-                                style={{ padding: '4px 8px', fontSize: '0.75rem', gap: '4px' }}
-                                title="Reschedule session"
-                              >
-                                <RefreshCw size={11} />
-                                Reschedule
-                              </button>
-                            )}
+                                {effectiveStatus === 'SCHEDULED' && (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setSelectedAppointment(appt);
+                                      setRescheduleModalOpen(true);
+                                    }}
+                                    className="btn btn-secondary btn-sm"
+                                    style={{ padding: '4px 8px', fontSize: '0.75rem', gap: '4px' }}
+                                    title="Reschedule session"
+                                  >
+                                    <RefreshCw size={11} />
+                                    Reschedule
+                                  </button>
+                                )}
 
-                            {appt.status === 'SCHEDULED' && (
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setSelectedAppointment(appt);
-                                  setCancelModalOpen(true);
-                                }}
-                                className="btn btn-danger btn-sm"
-                                style={{ padding: '4px 8px', fontSize: '0.75rem', gap: '4px' }}
-                                title="Cancel appointment slot"
-                              >
-                                <XCircle size={11} />
-                                Cancel
-                              </button>
-                            )}
-                          </div>
+                                {effectiveStatus === 'SCHEDULED' && (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setSelectedAppointment(appt);
+                                      setCancelModalOpen(true);
+                                    }}
+                                    className="btn btn-danger btn-sm"
+                                    style={{ padding: '4px 8px', fontSize: '0.75rem', gap: '4px' }}
+                                    title="Cancel appointment slot"
+                                  >
+                                    <XCircle size={11} />
+                                    Cancel
+                                  </button>
+                                )}
+
+                                {effectiveStatus === 'COMPLETED' && (
+                                  <span style={{ color: '#818cf8', fontSize: '0.78rem', display: 'inline-flex', alignItems: 'center', gap: '4px', fontWeight: 600 }}>
+                                    <CheckCircle size={13} />
+                                    Completed
+                                  </span>
+                                )}
+                              </div>
+                            );
+                          })()}
                         </td>
                       </tr>
                     ))

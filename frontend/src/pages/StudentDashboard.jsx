@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import RescheduleModal from '../components/RescheduleModal';
 import CancelModal from '../components/CancelModal';
+import { getEffectiveAppointmentStatus } from '../utils/timeConflict';
 
 export default function StudentDashboard() {
   const { user, isStudent } = useAuth();
@@ -31,6 +32,7 @@ export default function StudentDashboard() {
   const [cancelModalOpen, setCancelModalOpen] = useState(false);
   const [selectedAppointment, setSelectedAppointment] = useState(null);
   const [toast, setToast] = useState(null);
+  const [, setTick] = useState(0);
 
   const showToast = (msg, type = 'success') => {
     setToast({ msg, type });
@@ -68,18 +70,25 @@ export default function StudentDashboard() {
       }
     };
     fetchDashboard();
+
+    // Auto-refresh effective statuses every 30 seconds as time passes
+    const timer = setInterval(() => {
+      setTick((t) => t + 1);
+    }, 30000);
+    return () => clearInterval(timer);
   }, []);
 
-  const getStatusBadge = (status) => {
-    switch (status) {
+  const getStatusBadge = (status, appt) => {
+    const effectiveStatus = appt ? getEffectiveAppointmentStatus(appt) : status;
+    switch (effectiveStatus) {
       case 'SCHEDULED':
         return <span className="badge badge-success"><span className="pulse-dot online"></span> Confirmed</span>;
       case 'COMPLETED':
-        return <span className="badge badge-primary">Completed</span>;
+        return <span className="badge badge-primary"><CheckCircle size={12} style={{ marginRight: '4px' }} /> Completed</span>;
       case 'CANCELLED':
         return <span className="badge badge-danger">Cancelled</span>;
       default:
-        return <span className="badge badge-warning">{status}</span>;
+        return <span className="badge badge-warning">{effectiveStatus}</span>;
     }
   };
 
@@ -185,121 +194,140 @@ export default function StudentDashboard() {
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                {appointments.map((appt) => (
-                  <div 
-                    key={appt._id}
-                    className="glass-panel"
-                    style={{
-                      padding: '24px 28px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      flexWrap: 'wrap',
-                      gap: '20px',
-                      borderLeft: appt.status === 'SCHEDULED' ? '4px solid #10b981' : appt.status === 'CANCELLED' ? '4px solid #f43f5e' : '4px solid #6366f1'
-                    }}
-                  >
-                    <div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
-                        <span className="badge badge-cyan" style={{ fontSize: '0.75rem' }}>
-                          <Clock size={12} />
-                          {appt.duration} Mins
-                        </span>
-                        {getStatusBadge(appt.status)}
+                {appointments.map((appt) => {
+                  const effectiveStatus = getEffectiveAppointmentStatus(appt);
+                  return (
+                    <div 
+                      key={appt._id}
+                      className="glass-panel"
+                      style={{
+                        padding: '24px 28px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        flexWrap: 'wrap',
+                        gap: '20px',
+                        borderLeft: effectiveStatus === 'SCHEDULED' ? '4px solid #10b981' : effectiveStatus === 'CANCELLED' ? '4px solid #f43f5e' : '4px solid #6366f1'
+                      }}
+                    >
+                      <div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
+                          <span className="badge badge-cyan" style={{ fontSize: '0.75rem' }}>
+                            <Clock size={12} />
+                            {appt.duration} Mins
+                          </span>
+                          {getStatusBadge(effectiveStatus, appt)}
+                        </div>
+
+                        <h3 style={{ fontSize: '1.25rem', color: '#fff', marginBottom: '6px' }}>
+                          {appt.sessionTitle || 'Interview Counselling'}
+                        </h3>
+
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '20px', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <Calendar size={14} color="#818cf8" />
+                            <span>{appt.date}</span>
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <Clock size={14} color="#818cf8" />
+                            <span>{appt.startTime} - {appt.endTime}</span>
+                          </div>
+                        </div>
+
+                        {appt.notes && (
+                          <div style={{ fontSize: '0.8rem', color: '#cbd5e1', marginTop: '10px', background: 'rgba(255, 255, 255, 0.02)', padding: '6px 12px', borderRadius: '6px' }}>
+                            <strong>Notes:</strong> {appt.notes}
+                          </div>
+                        )}
+
+                        {appt.cancellationReason && (
+                          <div style={{ fontSize: '0.8rem', color: '#fda4af', marginTop: '8px' }}>
+                            <strong>Cancellation Reason:</strong> {appt.cancellationReason}
+                          </div>
+                        )}
                       </div>
 
-                      <h3 style={{ fontSize: '1.25rem', color: '#fff', marginBottom: '6px' }}>
-                        {appt.sessionTitle || 'Interview Counselling'}
-                      </h3>
+                      <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+                        {appt.googleMeetLink && effectiveStatus === 'SCHEDULED' && (
+                          <a
+                            href={appt.googleMeetLink}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="btn btn-primary btn-sm"
+                            style={{
+                              background: '#10b981',
+                              borderColor: '#10b981',
+                              color: '#fff',
+                              fontWeight: 600,
+                              boxShadow: '0 4px 12px rgba(16, 185, 129, 0.3)'
+                            }}
+                          >
+                            <Video size={14} />
+                            <span>Join Google Meet</span>
+                          </a>
+                        )}
 
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '20px', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          <Calendar size={14} color="#818cf8" />
-                          <span>{appt.date}</span>
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          <Clock size={14} color="#818cf8" />
-                          <span>{appt.startTime} - {appt.endTime}</span>
-                        </div>
+                        {effectiveStatus === 'SCHEDULED' && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedAppointment(appt);
+                              setRescheduleModalOpen(true);
+                            }}
+                            className="btn btn-secondary btn-sm"
+                            style={{ gap: '6px' }}
+                          >
+                            <RefreshCw size={13} />
+                            <span>Reschedule</span>
+                          </button>
+                        )}
+
+                        {effectiveStatus === 'SCHEDULED' && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedAppointment(appt);
+                              setCancelModalOpen(true);
+                            }}
+                            className="btn btn-danger btn-sm"
+                            style={{ gap: '6px' }}
+                          >
+                            <XCircle size={13} />
+                            <span>Cancel Slot</span>
+                          </button>
+                        )}
+
+                        {effectiveStatus === 'COMPLETED' && (
+                          <span
+                            className="badge badge-primary"
+                            style={{
+                              padding: '6px 12px',
+                              fontSize: '0.8rem',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '6px'
+                            }}
+                          >
+                            <CheckCircle size={13} />
+                            Session Completed
+                          </span>
+                        )}
+
+                        {appt.googleCalendarEventUrl && (
+                          <a
+                            href={appt.googleCalendarEventUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="btn btn-outline btn-sm"
+                            title="Open Calendar Event"
+                          >
+                            Google Calendar
+                          </a>
+                        )}
                       </div>
-
-                      {appt.notes && (
-                        <div style={{ fontSize: '0.8rem', color: '#cbd5e1', marginTop: '10px', background: 'rgba(255, 255, 255, 0.02)', padding: '6px 12px', borderRadius: '6px' }}>
-                          <strong>Notes:</strong> {appt.notes}
-                        </div>
-                      )}
-
-                      {appt.cancellationReason && (
-                        <div style={{ fontSize: '0.8rem', color: '#fda4af', marginTop: '8px' }}>
-                          <strong>Cancellation Reason:</strong> {appt.cancellationReason}
-                        </div>
-                      )}
                     </div>
-
-                    <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
-                      {appt.googleMeetLink && appt.status === 'SCHEDULED' && (
-                        <a
-                          href={appt.googleMeetLink}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="btn btn-primary btn-sm"
-                          style={{
-                            background: '#10b981',
-                            borderColor: '#10b981',
-                            color: '#fff',
-                            fontWeight: 600,
-                            boxShadow: '0 4px 12px rgba(16, 185, 129, 0.3)'
-                          }}
-                        >
-                          <Video size={14} />
-                          <span>Join Google Meet</span>
-                        </a>
-                      )}
-
-                      {appt.status === 'SCHEDULED' && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setSelectedAppointment(appt);
-                            setRescheduleModalOpen(true);
-                          }}
-                          className="btn btn-secondary btn-sm"
-                          style={{ gap: '6px' }}
-                        >
-                          <RefreshCw size={13} />
-                          <span>Reschedule</span>
-                        </button>
-                      )}
-
-                      {appt.status === 'SCHEDULED' && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setSelectedAppointment(appt);
-                            setCancelModalOpen(true);
-                          }}
-                          className="btn btn-danger btn-sm"
-                          style={{ gap: '6px' }}
-                        >
-                          <XCircle size={13} />
-                          <span>Cancel Slot</span>
-                        </button>
-                      )}
-
-                      {appt.googleCalendarEventUrl && (
-                        <a
-                          href={appt.googleCalendarEventUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="btn btn-outline btn-sm"
-                          title="Open Calendar Event"
-                        >
-                          Google Calendar
-                        </a>
-                      )}
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>

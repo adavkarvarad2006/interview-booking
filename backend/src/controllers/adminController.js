@@ -5,12 +5,19 @@ const BlockedDate = require('../models/BlockedDate');
 const InterviewSession = require('../models/InterviewSession');
 const CalendlyIntegration = require('../models/CalendlyIntegration');
 const Notification = require('../models/Notification');
+const { 
+  autoCompletePastAppointments, 
+  hasAppointmentPassed 
+} = require('../utils/timeConflict');
 
 // @desc    Get Admin Dashboard Stats
 // @route   GET /api/admin/dashboard-stats
 // @access  Private (Admin/Counsellor)
 const getDashboardStats = async (req, res) => {
   try {
+    // Ensure all passed scheduled appointments are marked COMPLETED
+    await autoCompletePastAppointments(Appointment);
+
     const todayStr = new Date().toISOString().split('T')[0];
 
     // Today's appointments count
@@ -19,11 +26,12 @@ const getDashboardStats = async (req, res) => {
       status: { $ne: 'CANCELLED' }
     });
 
-    // Upcoming appointments count (date >= today and status == 'SCHEDULED')
-    const upcomingCount = await Appointment.countDocuments({
+    // Upcoming appointments count (scheduled appointments whose scheduled time has not passed)
+    const upcomingScheduled = await Appointment.find({
       date: { $gte: todayStr },
-      status: 'SCHEDULED'
+      status: { $in: ['SCHEDULED', 'RESCHEDULED'] }
     });
+    const upcomingCount = upcomingScheduled.filter(appt => !hasAppointmentPassed(appt)).length;
 
     // Completed sessions count
     const completedCount = await Appointment.countDocuments({
@@ -172,6 +180,9 @@ const updateIntegrationConfig = async (req, res) => {
 // @access  Private (Admin/Counsellor)
 const getAllStudents = async (req, res) => {
   try {
+    // Ensure all passed scheduled appointments are marked COMPLETED
+    await autoCompletePastAppointments(Appointment);
+
     const students = await User.find({ role: 'STUDENT' }).sort({ createdAt: -1 });
 
     const studentData = await Promise.all(

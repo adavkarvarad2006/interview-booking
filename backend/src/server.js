@@ -119,6 +119,7 @@ app.use((err, req, res, next) => {
 const PORT = process.env.PORT || 5000;
 
 const { verifyEmailTransporter } = require('./services/emailService');
+const { autoCompletePastAppointments } = require('./utils/timeConflict');
 
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`=======================================================`);
@@ -127,6 +128,18 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log(`📆 Calendar Integration: Google Calendar`);
   console.log(`🔗 Webhook Endpoint: http://localhost:${PORT}/api/calendly/webhook`);
   
+  // Auto-complete any appointments whose scheduled time has already passed
+  autoCompletePastAppointments().catch(err => {
+    console.error('[Startup Auto-Complete Warning]:', err.message);
+  });
+
+  // Run periodic background check every 60 seconds
+  setInterval(() => {
+    autoCompletePastAppointments().catch(err => {
+      console.error('[Background Auto-Complete Error]:', err.message);
+    });
+  }, 60000);
+
   // Verify Nodemailer Email Transporter
   verifyEmailTransporter().then(status => {
     if (status.verified) {

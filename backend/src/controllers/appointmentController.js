@@ -1,12 +1,20 @@
 const Appointment = require('../models/Appointment');
 const Notification = require('../models/Notification');
-const { findAppointmentConflict, computeEndTime } = require('../utils/timeConflict');
+const { 
+  findAppointmentConflict, 
+  computeEndTime, 
+  autoCompletePastAppointments, 
+  hasAppointmentPassed 
+} = require('../utils/timeConflict');
 
 // @desc    Get appointments for the logged-in student
 // @route   GET /api/appointments/my
 // @access  Private (Student)
 const getMyAppointments = async (req, res) => {
   try {
+    // Automatically complete any appointments whose scheduled time has passed
+    await autoCompletePastAppointments(Appointment);
+
     const studentEmail = req.user.email.toLowerCase();
     const studentId = req.user._id;
 
@@ -31,6 +39,9 @@ const getMyAppointments = async (req, res) => {
 // @access  Private (Admin/Counsellor)
 const getAllAppointments = async (req, res) => {
   try {
+    // Automatically complete any appointments whose scheduled time has passed
+    await autoCompletePastAppointments(Appointment);
+
     const { status, search, limit = 50, page = 1 } = req.query;
     const filter = {};
 
@@ -73,9 +84,18 @@ const getAllAppointments = async (req, res) => {
 // @access  Private
 const getAppointmentById = async (req, res) => {
   try {
-    const appointment = await Appointment.findById(req.params.id).populate('sessionId');
+    let appointment = await Appointment.findById(req.params.id).populate('sessionId');
     if (!appointment) {
       return res.status(404).json({ success: false, message: 'Appointment not found' });
+    }
+
+    // If meet time has passed, mark it completed
+    if (
+      (appointment.status === 'SCHEDULED' || appointment.status === 'RESCHEDULED') &&
+      hasAppointmentPassed(appointment)
+    ) {
+      appointment.status = 'COMPLETED';
+      await appointment.save();
     }
 
     // Ensure authorized user (Admin or Appointment owner)
