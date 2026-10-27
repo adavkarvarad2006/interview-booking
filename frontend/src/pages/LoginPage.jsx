@@ -446,6 +446,15 @@ export default function LoginPage({ initialPortal = 'STUDENT' }) {
                     <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                       <button
                         type="button"
+                        onClick={() => setEmail('adavkarvarad2006@gmail.com')}
+                        className="btn btn-secondary btn-sm"
+                        style={{ fontSize: '0.75rem', padding: '5px 10px', borderColor: '#6366f1' }}
+                      >
+                        <Mail size={13} color="#818cf8" />
+                        adavkarvarad2006@gmail.com (Your Email)
+                      </button>
+                      <button
+                        type="button"
                         onClick={() => setEmail('parkavi.a@msrit.edu')}
                         className="btn btn-secondary btn-sm"
                         style={{ fontSize: '0.75rem', padding: '5px 10px' }}
@@ -484,6 +493,9 @@ export default function LoginPage({ initialPortal = 'STUDENT' }) {
                     </div>
                     <div style={{ fontWeight: 600, color: '#fff', fontSize: '0.9rem' }}>
                       {email}
+                    </div>
+                    <div style={{ fontSize: '0.75rem', color: '#a5b4fc', marginTop: '6px' }}>
+                      📬 <em>Check your Inbox, Spam, and Promotions folder. Real emails are sent via Gmail SMTP.</em>
                     </div>
                   </div>
 

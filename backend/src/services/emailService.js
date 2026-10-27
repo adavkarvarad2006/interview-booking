@@ -1,4 +1,20 @@
+const path = require('path');
+const fs = require('fs');
+const dotenv = require('dotenv');
 const nodemailer = require('nodemailer');
+
+// Ensure environment variables are loaded regardless of current working directory
+if (!process.env.SMTP_USER) {
+  const backendEnv = path.join(__dirname, '../../.env');
+  const rootEnv = path.join(__dirname, '../../../.env');
+  if (fs.existsSync(backendEnv)) {
+    dotenv.config({ path: backendEnv });
+  } else if (fs.existsSync(rootEnv)) {
+    dotenv.config({ path: rootEnv });
+  } else {
+    dotenv.config();
+  }
+}
 
 /**
  * Configure email transporter
@@ -70,7 +86,7 @@ const getFromAddress = () => {
   if (process.env.SMTP_FROM) {
     return process.env.SMTP_FROM;
   }
-  const fromName = process.env.SMTP_FROM_NAME || 'InterviewPrep Portal';
+  const fromName = (process.env.SMTP_FROM_NAME || 'InterviewPrep Portal').replace(/^["']|["']$/g, '').trim();
   const user = process.env.SMTP_USER;
   if (user && !user.includes('your-email@')) {
     return `"${fromName}" <${user.trim()}>`;

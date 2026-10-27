@@ -244,15 +244,17 @@ const sendOtp = async (req, res) => {
     const isSimulated = emailResult.simulated === true;
     const isDev = process.env.NODE_ENV !== 'production';
 
+    console.log(`[Send OTP] Generated OTP for ${cleanEmail}: ${otp} (Real email dispatched: ${!isSimulated})`);
+
     res.json({
       success: true,
       message: isSimulated
         ? `[Dev Simulation] Verification code generated for ${cleanEmail}`
-        : `A 6-digit verification code has been dispatched to ${cleanEmail}. Please check your inbox or spam folder.`,
+        : `A 6-digit verification code has been dispatched to ${cleanEmail}. Please check your inbox, spam, or promotions folder.`,
       email: cleanEmail,
       expiresInMinutes: 10,
       simulated: isSimulated,
-      devOtp: (isSimulated && isDev) ? otp : undefined
+      devOtp: isDev ? otp : undefined
     });
   } catch (error) {
     console.error('[Send OTP Error]', error);

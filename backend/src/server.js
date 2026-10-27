@@ -3,10 +3,18 @@ const fs = require('fs');
 const express = require('express');
 const cors = require('cors');
 const dotenv = require('dotenv');
-const connectDB = require('./config/db');
+// Load environment variables (supports running from root or backend directory)
+const backendEnv = path.join(__dirname, '../.env');
+const rootEnv = path.join(__dirname, '../../.env');
+if (fs.existsSync(backendEnv)) {
+  dotenv.config({ path: backendEnv });
+} else if (fs.existsSync(rootEnv)) {
+  dotenv.config({ path: rootEnv });
+} else {
+  dotenv.config();
+}
 
-// Load environment variables
-dotenv.config();
+const connectDB = require('./config/db');
 
 // Connect to MongoDB
 connectDB();
