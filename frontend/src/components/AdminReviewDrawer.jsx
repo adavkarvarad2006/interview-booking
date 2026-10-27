@@ -18,7 +18,7 @@ import {
   Upload,
   RefreshCw
 } from 'lucide-react';
-import { api } from '../services/api';
+import { api, getFileUrl, getAppointmentResumeUrl } from '../services/api';
 
 export default function AdminReviewDrawer({ 
   isOpen, 
@@ -28,6 +28,7 @@ export default function AdminReviewDrawer({
   onOpenReschedule 
 }) {
   const [activeView, setActiveView] = useState('resume'); // 'resume', 'context', 'notes'
+  const [currentAppt, setCurrentAppt] = useState(appointment);
   const [prepNotes, setPrepNotes] = useState('');
   const [githubUrl, setGithubUrl] = useState('');
   const [linkedinUrl, setLinkedinUrl] = useState('');
@@ -38,14 +39,30 @@ export default function AdminReviewDrawer({
   const [uploadingResume, setUploadingResume] = useState(false);
 
   useEffect(() => {
+    setCurrentAppt(appointment);
     if (appointment) {
       setPrepNotes(appointment.notes || '');
       setGithubUrl(appointment.githubUrl || '');
       setLinkedinUrl(appointment.linkedinUrl || '');
       setPortfolioUrl(appointment.portfolioUrl || '');
       setIsEditingLinks(false);
+
+      // If appointment lacks resumeUrl, query backend to fetch freshly synced student resume
+      if (isOpen && appointment._id && !appointment.resumeUrl) {
+        api.getAppointment(appointment._id).then(res => {
+          if (res?.success && res?.data) {
+            setCurrentAppt(res.data);
+            if (onUpdateAppointment) {
+              onUpdateAppointment(res.data);
+            }
+          }
+        }).catch(err => {
+          console.warn('[AdminReviewDrawer] Could not fetch fresh appointment:', err);
+        });
+      }
     }
-  }, [appointment]);
+  }, [appointment, isOpen]);
+
 
   // Handle ESC key to close drawer
   useEffect(() => {
@@ -113,10 +130,11 @@ export default function AdminReviewDrawer({
 
         if (res.success && res.data) {
           const updated = {
-            ...appointment,
+            ...(currentAppt || appointment),
             resumeUrl: res.data.resumeUrl,
             resumeFileName: res.data.resumeFileName
           };
+          setCurrentAppt(updated);
           if (onUpdateAppointment) {
             onUpdateAppointment(updated);
           }
@@ -130,9 +148,17 @@ export default function AdminReviewDrawer({
     reader.readAsDataURL(file);
   };
 
-  const resumeUrl = appointment.resumeUrl || '';
-  const resumeFileName = appointment.resumeFileName || (resumeUrl ? resumeUrl.split('/').pop() : 'Candidate_Resume.pdf');
-  const meetLink = appointment.googleMeetLink || appointment.meetUrl || 'https://meet.google.com/new';
+  const activeAppt = currentAppt || appointment;
+  const rawResumeUrl = activeAppt?.resumeUrl || activeAppt?.sessionId?.resumeUrl || '';
+  const effectiveResumeUrl = rawResumeUrl ? getFileUrl(rawResumeUrl) : (activeAppt?._id ? getAppointmentResumeUrl(activeAppt._id) : '');
+  const resumeFileName = activeAppt?.resumeFileName || (rawResumeUrl ? rawResumeUrl.split('/').pop() : 'Candidate_Resume.pdf');
+  const meetLink = activeAppt?.googleMeetLink || activeAppt?.meetUrl || 'https://meet.google.com/new';
+
+  let embedUrl = effectiveResumeUrl;
+  if (embedUrl.includes('drive.google.com') && embedUrl.includes('/view')) {
+    embedUrl = embedUrl.replace(/\/view(\?.*)?$/, '/preview');
+  }
+
 
   return (
     <div 
@@ -360,7 +386,7 @@ export default function AdminReviewDrawer({
           {/* VIEW 1: RESUME PDF */}
           {activeView === 'resume' && (
             <div>
-              {resumeUrl ? (
+              {rawResumeUrl ? (
                 <div>
                   {/* File Info Bar */}
                   <div
@@ -404,7 +430,7 @@ export default function AdminReviewDrawer({
 
                     <div style={{ display: 'flex', gap: '8px' }}>
                       <a
-                        href={resumeUrl}
+                        href={effectiveResumeUrl}
                         target="_blank"
                         rel="noreferrer"
                         className="btn btn-secondary btn-sm"
@@ -414,7 +440,7 @@ export default function AdminReviewDrawer({
                         Open Tab
                       </a>
                       <a
-                        href={resumeUrl}
+                        href={effectiveResumeUrl}
                         download={resumeFileName}
                         className="btn btn-outline btn-sm"
                         style={{ fontSize: '0.8rem', padding: '6px 12px', display: 'flex', alignItems: 'center', gap: '5px' }}
@@ -437,19 +463,49 @@ export default function AdminReviewDrawer({
                       flexDirection: 'column'
                     }}
                   >
-                    <iframe
-                      src={`${resumeUrl}#toolbar=1&navpanes=0`}
-                      title="Candidate Resume"
+                    <object
+                      data={`${embedUrl}#toolbar=1&navpanes=0`}
+                      type="application/pdf"
                       style={{
                         width: '100%',
                         height: '100%',
                         border: 'none',
                         background: '#ffffff'
                       }}
-                    />
+                    >
+                      <iframe
+                        src={`${embedUrl}#toolbar=1&navpanes=0`}
+                        title="Candidate Resume"
+                        style={{
+                          width: '100%',
+                          height: '100%',
+                          border: 'none',
+                          background: '#ffffff'
+                        }}
+                      >
+                        <div style={{ padding: '32px 20px', textAlign: 'center', color: '#fff', background: '#0f172a', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+                          <FileText size={40} color="#818cf8" style={{ marginBottom: '16px' }} />
+                          <h4 style={{ color: '#fff', marginBottom: '8px' }}>Resume Ready to View</h4>
+                          <p style={{ color: '#94a3b8', fontSize: '0.9rem', marginBottom: '20px', maxWidth: '380px' }}>
+                            Click below to open or download the candidate's uploaded resume PDF in a dedicated viewer tab.
+                          </p>
+                          <a
+                            href={effectiveResumeUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="btn btn-primary"
+                            style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}
+                          >
+                            <ExternalLink size={16} />
+                            Open Candidate Resume PDF
+                          </a>
+                        </div>
+                      </iframe>
+                    </object>
                   </div>
                 </div>
               ) : (
+
                 /* Empty state when student hasn't uploaded a resume yet */
                 <div
                   style={{

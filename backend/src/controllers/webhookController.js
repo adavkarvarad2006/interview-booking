@@ -215,7 +215,23 @@ const handleCalendlyWebhook = async (req, res) => {
         { upsert: true, new: true }
       );
 
+      if (studentUser && (payload.resumeUrl || payload.githubUrl || payload.linkedinUrl)) {
+        const studentUpdates = {};
+        if (payload.resumeUrl) {
+          studentUpdates.resumeUrl = payload.resumeUrl;
+          studentUpdates.resumeFileName = payload.resumeFileName || payload.resumeUrl.split('/').pop();
+        }
+        if (payload.githubUrl) studentUpdates.githubUrl = payload.githubUrl;
+        if (payload.linkedinUrl) studentUpdates.linkedinUrl = payload.linkedinUrl;
+        await Student.findOneAndUpdate(
+          { userId: studentUser._id },
+          { $set: studentUpdates },
+          { upsert: true }
+        );
+      }
+
       console.log(`[Webhook] Appointment created/updated: ${appointment._id} for ${studentEmail} with Meet Link: ${googleMeetLink}`);
+
 
       // Create in-app notification for student
       if (studentUser) {

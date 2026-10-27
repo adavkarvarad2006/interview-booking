@@ -206,10 +206,10 @@ const updateProfile = async (req, res) => {
 
 // @desc    Upload student resume (PDF format)
 // @route   POST /api/auth/upload-resume
-// @access  Private (Student/User)
+// @access  Public / Optional Protect
 const uploadResume = async (req, res) => {
   try {
-    const { fileName, fileData, appointmentId } = req.body;
+    const { fileName, fileData, appointmentId, studentEmail } = req.body;
     if (!fileData) {
       return res.status(400).json({ success: false, message: 'No file data received' });
     }
@@ -222,9 +222,9 @@ const uploadResume = async (req, res) => {
 
     const buffer = Buffer.from(base64Content, 'base64');
 
-    // File size check (max 12MB)
-    if (buffer.length > 12 * 1024 * 1024) {
-      return res.status(400).json({ success: false, message: 'Resume file size exceeds maximum limit of 12MB' });
+    // File size check (max 15MB)
+    if (buffer.length > 15 * 1024 * 1024) {
+      return res.status(400).json({ success: false, message: 'Resume file size exceeds maximum limit of 15MB' });
     }
 
     const uploadsDir = path.join(__dirname, '../../uploads/resumes');
@@ -236,29 +236,74 @@ const uploadResume = async (req, res) => {
     const origName = (fileName || 'resume.pdf').replace(/[^a-zA-Z0-9._-]/g, '_');
     const ext = path.extname(origName) || '.pdf';
     const timestamp = Date.now();
-    const safeFileName = `resume_${req.user._id}_${timestamp}${ext}`;
+    const idPrefix = req.user ? req.user._id : 'student';
+    const safeFileName = `resume_${idPrefix}_${timestamp}${ext}`;
     const filePath = path.join(uploadsDir, safeFileName);
 
     await fs.promises.writeFile(filePath, buffer);
     const resumeUrl = `/uploads/resumes/${safeFileName}`;
     const originalDisplayName = fileName || origName;
 
-    // Save to Student profile
-    await Student.findOneAndUpdate(
-      { userId: req.user._id },
-      { 
-        $set: { 
-          resumeUrl, 
-          resumeFileName: originalDisplayName 
-        } 
-      },
-      { upsert: true, new: true }
-    );
+    // Determine target student userId and email
+    let targetStudentUserId = req.user ? req.user._id : null;
+    let targetEmail = (studentEmail || (req.user ? req.user.email : '')).toLowerCase().trim();
 
-    // If appointmentId provided, also attach to that appointment
+    // 1. If appointmentId provided: update that appointment immediately
     if (appointmentId) {
-      await Appointment.findByIdAndUpdate(
+      const appt = await Appointment.findByIdAndUpdate(
         appointmentId,
+        {
+          $set: {
+            resumeUrl,
+            resumeFileName: originalDisplayName
+          }
+        },
+        { new: true }
+      );
+      if (appt) {
+        if (appt.studentId) targetStudentUserId = appt.studentId;
+        if (appt.studentEmail) targetEmail = appt.studentEmail.toLowerCase().trim();
+      }
+    }
+
+    // 2. Find user by targetEmail if targetStudentUserId is not yet set
+    if (!targetStudentUserId && targetEmail) {
+      const matchedUser = await User.findOne({ email: targetEmail });
+      if (matchedUser) targetStudentUserId = matchedUser._id;
+    }
+
+    // 3. Update Student profile document if user exists
+    if (targetStudentUserId) {
+      await Student.findOneAndUpdate(
+        { userId: targetStudentUserId },
+        { 
+          $set: { 
+            resumeUrl, 
+            resumeFileName: originalDisplayName 
+          } 
+        },
+        { upsert: true, new: true }
+      );
+
+      // Automatically sync all existing appointments for this student
+      await Appointment.updateMany(
+        { 
+          $or: [
+            { studentId: targetStudentUserId },
+            ...(targetEmail ? [{ studentEmail: targetEmail }] : [])
+          ]
+        },
+        {
+          $set: {
+            resumeUrl,
+            resumeFileName: originalDisplayName
+          }
+        }
+      );
+    } else if (targetEmail) {
+      // Sync appointments by studentEmail
+      await Appointment.updateMany(
+        { studentEmail: targetEmail },
         {
           $set: {
             resumeUrl,
@@ -268,17 +313,46 @@ const uploadResume = async (req, res) => {
       );
     }
 
+    // Determine backend host to return full URL for immediate access
+    const protocol = req.protocol;
+    const host = req.get('host');
+    const fullUrl = `${protocol}://${host}${resumeUrl}`;
+
     res.json({
       success: true,
       message: 'Resume uploaded successfully',
       data: {
         resumeUrl,
-        resumeFileName: originalDisplayName
+        resumeFileName: originalDisplayName,
+        fullUrl
       }
     });
   } catch (error) {
     console.error('[Upload Resume Error]', error);
     res.status(500).json({ success: false, message: error.message || 'Failed to save resume' });
+  }
+};
+
+// @desc    Download / Stream resume PDF with inline headers
+// @route   GET /api/auth/resume-file/:filename
+// @access  Public
+const serveResumeFile = async (req, res) => {
+  try {
+    const filename = path.basename(req.params.filename);
+    const uploadsDir = path.join(__dirname, '../../uploads/resumes');
+    const filePath = path.join(uploadsDir, filename);
+
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ success: false, message: 'Resume file not found on server' });
+    }
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="${filename}"`);
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+    res.sendFile(filePath);
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 
@@ -468,7 +542,9 @@ module.exports = {
   getMe,
   updateProfile,
   uploadResume,
+  serveResumeFile,
   deleteResume,
   sendOtp,
   verifyOtp
 };
+

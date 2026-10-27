@@ -50,8 +50,24 @@ if (!fs.existsSync(resumesDir)) {
   fs.mkdirSync(resumesDir, { recursive: true });
 }
 
-// Serve uploaded documents statically
-app.use('/uploads', express.static(uploadsDir));
+// Serve uploaded documents statically with permissive CORS and CORP headers
+const uploadsStaticMiddleware = [
+  (req, res, next) => {
+    res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
+    if (req.path.endsWith('.pdf')) {
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', 'inline');
+    }
+    next();
+  },
+  express.static(uploadsDir)
+];
+
+app.use('/uploads', uploadsStaticMiddleware);
+app.use('/api/uploads', uploadsStaticMiddleware);
+
 
 // We parse raw body or JSON (supports base64 PDF uploads up to 15MB)
 app.use(express.json({
@@ -154,6 +170,35 @@ app.listen(PORT, '0.0.0.0', () => {
   autoCompletePastAppointments().catch(err => {
     console.error('[Startup Auto-Complete Warning]:', err.message);
   });
+
+  // Backfill any appointments missing resumeUrl if the student has a resume uploaded
+  const syncResumes = async () => {
+    try {
+      const Student = require('./models/Student');
+      const Appointment = require('./models/Appointment');
+      const students = await Student.find({ resumeUrl: { $exists: true, $ne: '' } });
+      for (const student of students) {
+        if (student.userId && student.resumeUrl) {
+          await Appointment.updateMany(
+            { 
+              studentId: student.userId, 
+              $or: [{ resumeUrl: { $exists: false } }, { resumeUrl: '' }, { resumeUrl: null }] 
+            },
+            { 
+              $set: { 
+                resumeUrl: student.resumeUrl, 
+                resumeFileName: student.resumeFileName || student.resumeUrl.split('/').pop() 
+              } 
+            }
+          );
+        }
+      }
+    } catch (err) {
+      console.warn('[Startup Resume Sync Warning]:', err.message);
+    }
+  };
+  syncResumes();
+
 
   // Run periodic background check every 60 seconds
   setInterval(() => {

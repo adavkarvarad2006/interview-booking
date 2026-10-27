@@ -2,6 +2,8 @@ const Appointment = require('../models/Appointment');
 const Notification = require('../models/Notification');
 const User = require('../models/User');
 const Student = require('../models/Student');
+const path = require('path');
+const fs = require('fs');
 const { 
   findAppointmentConflict, 
   computeEndTime, 
@@ -402,6 +404,64 @@ const updateAppointmentContext = async (req, res) => {
   }
 };
 
+// @desc    Download / view resume for an appointment
+// @route   GET /api/appointments/:id/resume
+// @access  Public / Authorized
+const getAppointmentResume = async (req, res) => {
+  try {
+    const appointment = await Appointment.findById(req.params.id);
+    if (!appointment) {
+      return res.status(404).json({ success: false, message: 'Appointment not found' });
+    }
+
+    let resumeUrl = appointment.resumeUrl;
+    let resumeFileName = appointment.resumeFileName;
+
+    // Fallback: check Student document if not attached to appointment directly
+    if (!resumeUrl) {
+      let student = null;
+      if (appointment.studentId) {
+        student = await Student.findOne({ userId: appointment.studentId });
+      }
+      if (!student && appointment.studentEmail) {
+        const user = await User.findOne({ email: appointment.studentEmail.toLowerCase() });
+        if (user) student = await Student.findOne({ userId: user._id });
+      }
+      if (student && student.resumeUrl) {
+        resumeUrl = student.resumeUrl;
+        resumeFileName = student.resumeFileName || resumeFileName;
+      }
+    }
+
+    if (!resumeUrl) {
+      return res.status(404).json({ success: false, message: 'No resume uploaded for this appointment' });
+    }
+
+    // If external link (e.g. Google Drive, Cloudinary, etc.)
+    if (resumeUrl.startsWith('http://') || resumeUrl.startsWith('https://')) {
+      return res.redirect(resumeUrl);
+    }
+
+    // Local file path
+    const filename = path.basename(resumeUrl);
+    const uploadsDir = path.join(__dirname, '../../uploads/resumes');
+    const filePath = path.join(uploadsDir, filename);
+
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ success: false, message: 'Resume file not found on disk' });
+    }
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="${resumeFileName || filename}"`);
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+    return res.sendFile(filePath);
+  } catch (error) {
+    console.error('[Get Appointment Resume Error]:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 module.exports = {
   getMyAppointments,
   getAllAppointments,
@@ -409,5 +469,7 @@ module.exports = {
   updateAppointmentStatus,
   cancelAppointment,
   rescheduleAppointment,
-  updateAppointmentContext
+  updateAppointmentContext,
+  getAppointmentResume
 };
+

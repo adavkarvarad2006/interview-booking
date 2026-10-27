@@ -119,11 +119,13 @@ export default function BookingPage() {
       try {
         const res = await api.uploadResume({
           fileName: file.name,
-          fileData: reader.result
+          fileData: reader.result,
+          studentEmail: user?.email || undefined
         });
         if (res.success && res.data) {
           setResumeUrl(res.data.resumeUrl);
           setResumeFileName(res.data.resumeFileName);
+
           setResumeSavedMsg('Resume PDF attached to session!');
           setTimeout(() => setResumeSavedMsg(''), 4000);
         }

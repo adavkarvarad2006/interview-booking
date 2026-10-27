@@ -29,6 +29,24 @@ const protect = async (req, res, next) => {
   }
 };
 
+const optionalProtect = async (req, res, next) => {
+  let token;
+  if (
+    req.headers.authorization &&
+    req.headers.authorization.startsWith('Bearer')
+  ) {
+    try {
+      token = req.headers.authorization.split(' ')[1];
+      const decoded = jwt.verify(token, process.env.JWT_SECRET || 'supersecret_counselling_jwt_key_2026_super_safe');
+      req.user = await User.findById(decoded.id).select('-password');
+    } catch (error) {
+      // Non-blocking for optional protect
+      console.warn('[Optional Auth] Token invalid, proceeding as guest');
+    }
+  }
+  return next();
+};
+
 const authorize = (...roles) => {
   return (req, res, next) => {
     if (!req.user || !roles.includes(req.user.role)) {
@@ -41,4 +59,5 @@ const authorize = (...roles) => {
   };
 };
 
-module.exports = { protect, authorize };
+module.exports = { protect, optionalProtect, authorize };
+

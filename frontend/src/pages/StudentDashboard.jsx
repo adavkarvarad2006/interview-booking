@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { api } from '../services/api';
+import { api, getFileUrl } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { 
   Calendar, 
@@ -615,7 +615,7 @@ export default function StudentDashboard() {
                       <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginBottom: '18px' }}>
                         <button
                           type="button"
-                          onClick={() => setPdfPreviewModal(studentProfile.resumeUrl)}
+                          onClick={() => setPdfPreviewModal(getFileUrl(studentProfile.resumeUrl))}
                           className="btn btn-primary btn-sm"
                           style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
                         >
@@ -624,7 +624,7 @@ export default function StudentDashboard() {
                         </button>
 
                         <a
-                          href={studentProfile.resumeUrl}
+                          href={getFileUrl(studentProfile.resumeUrl)}
                           target="_blank"
                           rel="noreferrer"
                           className="btn btn-secondary btn-sm"
@@ -635,7 +635,7 @@ export default function StudentDashboard() {
                         </a>
 
                         <a
-                          href={studentProfile.resumeUrl}
+                          href={getFileUrl(studentProfile.resumeUrl)}
                           download={studentProfile.resumeFileName || 'Resume.pdf'}
                           className="btn btn-outline btn-sm"
                           style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
@@ -974,7 +974,7 @@ export default function StudentDashboard() {
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                   <a
-                    href={pdfPreviewModal}
+                    href={getFileUrl(pdfPreviewModal)}
                     target="_blank"
                     rel="noreferrer"
                     className="btn btn-secondary btn-sm"
@@ -999,11 +999,17 @@ export default function StudentDashboard() {
               </div>
 
               <div style={{ flex: 1, background: '#1e293b' }}>
-                <iframe
-                  src={`${pdfPreviewModal}#toolbar=1`}
-                  title="Resume Preview"
+                <object
+                  data={`${getFileUrl(pdfPreviewModal)}#toolbar=1`}
+                  type="application/pdf"
                   style={{ width: '100%', height: '100%', border: 'none' }}
-                />
+                >
+                  <iframe
+                    src={`${getFileUrl(pdfPreviewModal)}#toolbar=1`}
+                    title="Resume Preview"
+                    style={{ width: '100%', height: '100%', border: 'none' }}
+                  />
+                </object>
               </div>
             </div>
           </div>

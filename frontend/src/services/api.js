@@ -1,6 +1,29 @@
 const API_URL = import.meta.env.VITE_API_URL || '/api';
 
 /**
+ * Convert relative file path (/uploads/...) or API route to an accessible URL
+ */
+export const getFileUrl = (url) => {
+  if (!url) return '';
+  if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:') || url.startsWith('blob:')) {
+    return url;
+  }
+  const apiUrl = import.meta.env.VITE_API_URL || '';
+  if (apiUrl && (apiUrl.startsWith('http://') || apiUrl.startsWith('https://'))) {
+    const backendOrigin = apiUrl.replace(/\/api\/?$/, '');
+    const cleanPath = url.startsWith('/') ? url : `/${url}`;
+    return `${backendOrigin}${cleanPath}`;
+  }
+  return url.startsWith('/') ? url : `/${url}`;
+};
+
+export const getAppointmentResumeUrl = (appointmentId) => {
+  const apiUrl = import.meta.env.VITE_API_URL || '/api';
+  return `${apiUrl}/appointments/${appointmentId}/resume`;
+};
+
+
+/**
  * Universal fetch wrapper that automatically attaches JWT token and parses JSON
  */
 async function request(endpoint, options = {}) {

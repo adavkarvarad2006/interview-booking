@@ -34,3 +34,6 @@ Thumbs.db
 # Uploaded candidate files
 backend/uploads/*
 !backend/uploads/.gitkeep
+!backend/uploads/resumes/
+!backend/uploads/resumes/.gitkeep
+
