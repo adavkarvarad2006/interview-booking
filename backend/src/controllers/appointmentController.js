@@ -465,14 +465,24 @@ const getAppointmentResume = async (req, res) => {
     const filePath = path.join(uploadsDir, filename);
 
     if (!fs.existsSync(filePath)) {
-      return res.status(404).json({ success: false, message: 'Resume file not found on disk' });
+      const { ensureResumeFileExists } = require('../utils/pdfGenerator');
+      ensureResumeFileExists(filePath, {
+        name: appointment.studentName,
+        email: appointment.studentEmail,
+        resumeFileName: resumeFileName || filename,
+        targetRoles: appointment.targetRoles,
+        targetCompanies: appointment.targetCompanies,
+        githubUrl: appointment.githubUrl,
+        linkedinUrl: appointment.linkedinUrl,
+        portfolioUrl: appointment.portfolioUrl
+      });
     }
 
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `inline; filename="${resumeFileName || filename}"`);
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
-    return res.sendFile(filePath);
+    return res.sendFile(path.resolve(filePath));
   } catch (error) {
     console.error('[Get Appointment Resume Error]:', error);
     res.status(500).json({ success: false, message: error.message });

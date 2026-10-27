@@ -108,8 +108,8 @@ export default function StudentDashboard() {
           setAppointments((prev) =>
             prev.map((a) => ({
               ...a,
-              resumeUrl: a.resumeUrl || res.data.resumeUrl,
-              resumeFileName: a.resumeFileName || res.data.resumeFileName
+              resumeUrl: res.data.resumeUrl,
+              resumeFileName: res.data.resumeFileName
             }))
           );
 

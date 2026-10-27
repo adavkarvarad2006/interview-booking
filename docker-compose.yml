@@ -15,6 +15,8 @@ services:
       - CALENDLY_WEBHOOK_SIGNING_KEY=${CALENDLY_WEBHOOK_SIGNING_KEY:-}
       - CALENDLY_15_MIN_URL=${CALENDLY_15_MIN_URL:-https://calendly.com/interview-counsellor/15-min-interview-counselling}
       - CALENDLY_30_MIN_URL=${CALENDLY_30_MIN_URL:-https://calendly.com/interview-counsellor/30-min-mock-interview-training}
+    volumes:
+      - ./backend/uploads:/app/backend/uploads
     depends_on:
       - mongo
     restart: unless-stopped

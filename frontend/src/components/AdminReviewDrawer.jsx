@@ -433,7 +433,30 @@ export default function AdminReviewDrawer({
                       </div>
                     </div>
 
-                    <div style={{ display: 'flex', gap: '8px' }}>
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                      <label
+                        className="btn btn-primary btn-sm"
+                        style={{
+                          fontSize: '0.8rem',
+                          padding: '6px 12px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '5px',
+                          cursor: uploadingResume ? 'not-allowed' : 'pointer',
+                          opacity: uploadingResume ? 0.7 : 1
+                        }}
+                        title="Upload a new PDF to replace this candidate's resume"
+                      >
+                        <Upload size={13} />
+                        <span>{uploadingResume ? 'Uploading...' : 'Replace PDF'}</span>
+                        <input
+                          type="file"
+                          accept=".pdf,application/pdf"
+                          onChange={handleFileUpload}
+                          disabled={uploadingResume}
+                          style={{ display: 'none' }}
+                        />
+                      </label>
                       <a
                         href={effectiveResumeUrl}
                         target="_blank"

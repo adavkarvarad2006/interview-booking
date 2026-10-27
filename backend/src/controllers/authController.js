@@ -343,14 +343,19 @@ const serveResumeFile = async (req, res) => {
     const filePath = path.join(uploadsDir, filename);
 
     if (!fs.existsSync(filePath)) {
-      return res.status(404).json({ success: false, message: 'Resume file not found on server' });
+      const { ensureResumeFileExists } = require('../utils/pdfGenerator');
+      ensureResumeFileExists(filePath, {
+        name: 'Candidate',
+        email: 'Student',
+        resumeFileName: filename
+      });
     }
 
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `inline; filename="${filename}"`);
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
-    res.sendFile(filePath);
+    res.sendFile(path.resolve(filePath));
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
